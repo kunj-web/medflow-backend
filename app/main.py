@@ -1,32 +1,62 @@
+from __future__ import annotations
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.core.config import settings
-from app.routers import auth, appointments, config, notifications
+
+# Routers — existing
+from app.routers.auth import router as auth_router
+from app.routers.appointments import router as appointments_router
+from app.routers.config import router as config_router
+from app.routers.notifications import router as notifications_router
+
+# Routers — new
+from app.routers.doctors import router as doctors_router
+from app.routers.patients import router as patients_router
+from app.routers.invoices import router as invoices_router
+from app.routers.hospital_admin import router as hospital_admin_router
 
 app = FastAPI(
-    title=settings.APP_NAME,
+    title="MedFlow API",
     version="1.0.0",
-    docs_url="/docs" if not settings.is_production else None,
-    redoc_url="/redoc" if not settings.is_production else None,
+    description="AI-native hospital operations platform",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
-# ─── CORS ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ─── Routers ──────────────────────────────────────────────────────────────────
-app.include_router(auth.router,          prefix="/api/v1")
-app.include_router(appointments.router,  prefix="/api/v1")
-app.include_router(config.router,        prefix="/api/v1")
-app.include_router(notifications.router, prefix="/api/v1")
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+PREFIX = "/api/v1"
+
+app.include_router(auth_router,          prefix=PREFIX)
+app.include_router(appointments_router,  prefix=PREFIX)
+app.include_router(config_router,        prefix=PREFIX)
+app.include_router(notifications_router, prefix=PREFIX)
+app.include_router(doctors_router,       prefix=PREFIX)
+app.include_router(patients_router,      prefix=PREFIX)
+app.include_router(invoices_router,      prefix=PREFIX)
+app.include_router(hospital_admin_router, prefix=PREFIX)
 
 
-# ─── Health check ─────────────────────────────────────────────────────────────
-@app.get("/health")
-def health():
-    return {"status": "ok", "app": settings.APP_NAME}
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+@app.get("/health", tags=["health"])
+def health() -> dict:
+    return {"status": "ok"}
