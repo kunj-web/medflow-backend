@@ -1,0 +1,16 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "app/db/*",
+    "app/core/config.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

@@ -10,6 +10,7 @@ from app.schemas.appointment import (
     AppointmentCreate,
     AppointmentResponse,
     AppointmentReschedule,
+    AppointmentCancel,
     AppointmentUpdate,
 )
 from app.schemas.pagination import PaginatedResponse
@@ -99,7 +100,7 @@ def get_appointment(
 @router.post("/{appointment_id}/cancel", response_model=AppointmentResponse)
 def cancel_appointment(
     appointment_id: UUID,
-    reason: str = Query(..., min_length=3),
+    data: AppointmentCancel,
     db: Session = Depends(get_db),
     current_user=Depends(require_role(
         UserRole.PATIENT, UserRole.STAFF, UserRole.ADMIN
@@ -109,7 +110,7 @@ def cancel_appointment(
         return AppointmentService(db).cancel(
             appointment_id=appointment_id,
             hospital_id=UUID(current_user["hospital_id"]),
-            reason=reason,
+            reason=data.reason,
             cancelled_by_user_id=UUID(current_user["user_id"]),
         )
     except ValueError as e:
