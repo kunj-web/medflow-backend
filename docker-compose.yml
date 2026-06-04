@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: medflow
+      POSTGRES_PASSWORD: medflow
+      POSTGRES_DB: medflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Backend — dev (auto-reload via watchfiles)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      target: dev             # dev stage: watchfiles installed, runs as root
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL so it points at the compose db service
+      DATABASE_URL: postgresql://medflow:medflow@db:5432/medflow
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # Mount the entire repo into /app so every file change is visible
+      # inside the container. watchfiles picks up the change and uvicorn
+      # restarts the server — no docker restart needed.
+      - .:/app
+    # CMD is inherited from the dev stage: alembic upgrade head + uvicorn --reload --reload-dir app
+
+volumes:
+  postgres_data:
