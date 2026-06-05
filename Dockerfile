@@ -5,69 +5,83 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-# Install build deps for psycopg2 and cryptography
+# System dependencies required for psycopg2 and cryptography
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Create virtual environment
+RUN python -m venv /venv
+
+# Activate venv
+ENV PATH="/venv/bin:$PATH"
+
+# Install Python dependencies
 COPY requirements.txt .
+
 RUN pip install --upgrade pip \
-    && pip install --prefix=/install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir -r requirements.txt
+
 
 # ---------------------------------------------------------------------------
-# Stage 2 — dev image (auto-reload, runs as root, source mounted at runtime)
+# Stage 2 — development image
+# Auto reload enabled via uvicorn --reload
+# Source code is mounted via docker-compose volume
 # ---------------------------------------------------------------------------
 FROM python:3.11-slim AS dev
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/install/bin:$PATH" \
-    PYTHONPATH="/app"
+    PATH="/venv/bin:$PATH"
 
+# Runtime dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /install /install
-
-# watchfiles is the fastest file-watcher uvicorn supports on Linux
-RUN pip install --no-cache-dir watchfiles
+# Copy virtual environment from builder
+COPY --from=builder /venv /venv
 
 WORKDIR /app
-# Source is volume-mounted by docker-compose — no COPY needed here
+
+# Source code is mounted via docker-compose
+# No COPY needed here
 
 EXPOSE 8000
 
-# --reload-dir scopes the watcher to app/ so changes to tests/ or alembic/
-# don't trigger unnecessary restarts.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "app"]
+
 
 # ---------------------------------------------------------------------------
-# Stage 3 — production runtime (non-root, no watchfiles, baked source)
+# Stage 3 — production runtime
+# Non-root user
+# No auto reload
+# Source code baked into image
 # ---------------------------------------------------------------------------
 FROM python:3.11-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/install/bin:$PATH" \
-    PYTHONPATH="/app"
+    PATH="/venv/bin:$PATH"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /install /install
+# Copy virtual environment
+COPY --from=builder /venv /venv
 
 WORKDIR /app
+
+# Copy application source
 COPY . .
 
-# Non-root user for security
+# Create non-root user
 RUN addgroup --system medflow && adduser --system --ingroup medflow medflow
+
 USER medflow
 
 EXPOSE 8000
 
-# Production: Railway runs `alembic upgrade head` as a release command.
-# This CMD is the fallback for non-Railway deployments.
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"]
