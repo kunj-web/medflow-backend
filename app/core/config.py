@@ -1,12 +1,18 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     # App
     APP_NAME: str = "Hospital Platform"
     APP_ENV: str = "development"
+
     SECRET_KEY: str
+
+    ALGORITHM: str = "HS256"
+
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
@@ -31,6 +37,15 @@ class Settings(BaseSettings):
     # CORS
     FRONTEND_URL: str = "http://localhost:3000"
 
+    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",")]
+        return value
+
     @property
     def is_production(self) -> bool:
         return self.APP_ENV == "production"
@@ -39,12 +54,14 @@ class Settings(BaseSettings):
     def is_testing(self) -> bool:
         return self.APP_ENV == "testing"
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     return Settings()
 

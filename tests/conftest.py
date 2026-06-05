@@ -20,14 +20,13 @@ def engine():
     Base.metadata.drop_all(_engine)
 
 
-# ─── DB Session — rolls back after every test ─────────────────────────────────
-
 @pytest.fixture(scope="function")
 def db(engine):
     connection = engine.connect()
     transaction = connection.begin()
     TestSession = sessionmaker(bind=connection)
     session = TestSession()
+    session.begin_nested()  # SAVEPOINT — commits inside won't escape this
 
     yield session
 
