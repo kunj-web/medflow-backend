@@ -146,7 +146,7 @@ class PatientService:
         patients, total = self.patient_repo.search(hospital_id, params, search)
         items = [PatientResponse.model_validate(p) for p in patients]
         return PaginatedResponse(
-            items=items,
+            data=items,
             total=total,
             page=params.page,
             page_size=params.page_size,
@@ -197,7 +197,7 @@ class PatientService:
         )
         items = [AppointmentResponse.model_validate(a) for a in appointments]
         return PaginatedResponse(
-            items=items,
+            data=items,
             total=total,
             page=params.page,
             page_size=params.page_size,
