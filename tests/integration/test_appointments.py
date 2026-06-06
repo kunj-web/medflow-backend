@@ -1,9 +1,8 @@
-import pytest
+from app.core.security import create_token_pair
+from app.models.enums import UserRole
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.patient_factory import PatientFactory
 from tests.factories.user_factory import UserFactory
-from app.models.enums import UserRole
-from app.core.security import create_token_pair
 
 VALID_SLOT = "2026-12-07T10:00:00+00:00"  # future Monday, 15-min aligned
 

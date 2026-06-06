@@ -11,6 +11,15 @@ Example:
 """
 
 # Enums
+# Appointment
+from app.models.appointment import Appointment
+
+# Doctor
+from app.models.doctor import (
+    Doctor,
+    DoctorLeave,
+    DoctorSchedule,
+)
 from app.models.enums import (
     AppointmentStatus,
     AppointmentType,
@@ -25,22 +34,6 @@ from app.models.enums import (
 # Hospital
 from app.models.hospital import Hospital, HospitalFeature
 
-# User
-from app.models.user import User
-
-# Patient
-from app.models.patient import Patient
-
-# Doctor
-from app.models.doctor import (
-    Doctor,
-    DoctorLeave,
-    DoctorSchedule,
-)
-
-# Appointment
-from app.models.appointment import Appointment
-
 # Invoice
 from app.models.invoice import Invoice
 
@@ -49,6 +42,12 @@ from app.models.notification import (
     Notification,
     UserDevice,
 )
+
+# Patient
+from app.models.patient import Patient
+
+# User
+from app.models.user import User
 
 __all__ = [
     # Enums

@@ -1,9 +1,10 @@
-from faker import Faker
 from uuid import UUID
+
+from faker import Faker
+
+from app.models.enums import BloodGroup, Gender, UserRole
 from app.models.patient import Patient
-from app.models.enums import Gender, BloodGroup
 from tests.factories.user_factory import UserFactory
-from app.models.enums import UserRole
 
 fake = Faker("en_IN")
 

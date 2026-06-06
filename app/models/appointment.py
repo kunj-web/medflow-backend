@@ -1,9 +1,10 @@
-from sqlalchemy import Column, DateTime, Text, ForeignKey, Index, Numeric
+import sqlalchemy as sa
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+
 from app.db.base import BaseModel, HospitalScopedMixin
 from app.models.enums import AppointmentStatus, AppointmentType
-import sqlalchemy as sa
 
 
 class Appointment(BaseModel, HospitalScopedMixin):

@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, field_validator
 
 from app.models.enums import InvoiceStatus
-from app.schemas.validators.common import validate_positive_amount, validate_non_empty_string
-
+from app.schemas.validators.common import validate_non_empty_string, validate_positive_amount
 
 # ---------------------------------------------------------------------------
 # Line items (embedded in invoice, not a separate DB table)
@@ -46,7 +44,7 @@ class InvoiceCreate(BaseModel):
     appointment_id: UUID
     line_items: list[InvoiceLineItem]
     discount_amount: float = 0.0
-    notes: Optional[str] = None
+    notes: str | None = None
 
     @field_validator("line_items")
     @classmethod
@@ -66,7 +64,7 @@ class InvoiceCreate(BaseModel):
 class PaymentRequest(BaseModel):
     amount_paid: float
     payment_method: str          # "cash" | "card" | "upi" | "insurance"
-    transaction_reference: Optional[str] = None
+    transaction_reference: str | None = None
 
     @field_validator("amount_paid")
     @classmethod
@@ -94,11 +92,11 @@ class InvoiceResponse(BaseModel):
     total_amount: float
     amount_paid: float
     balance_due: float
-    payment_method: Optional[str]
-    transaction_reference: Optional[str]
-    notes: Optional[str]
-    issued_at: Optional[datetime]
-    paid_at: Optional[datetime]
+    payment_method: str | None
+    transaction_reference: str | None
+    notes: str | None
+    issued_at: datetime | None
+    paid_at: datetime | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

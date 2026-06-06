@@ -1,17 +1,18 @@
-from uuid import UUID
-from typing import List, Optional
-from sqlalchemy.orm import Session, joinedload
-from app.repositories.base import BaseRepository
-from app.models.doctor import Doctor, DoctorSchedule, DoctorLeave
-from app.models.enums import DayOfWeek
 from datetime import date
+from uuid import UUID
+
+from sqlalchemy.orm import Session, joinedload
+
+from app.models.doctor import Doctor, DoctorLeave, DoctorSchedule
+from app.models.enums import DayOfWeek
+from app.repositories.base import BaseRepository
 
 
 class DoctorRepository(BaseRepository[Doctor]):
     def __init__(self, db: Session):
         super().__init__(Doctor, db)
 
-    def get_by_id_with_relations(self, id: UUID) -> Optional[Doctor]:
+    def get_by_id_with_relations(self, id: UUID) -> Doctor | None:
         return (
             self.db.query(Doctor)
             .options(
@@ -25,7 +26,7 @@ class DoctorRepository(BaseRepository[Doctor]):
             .first()
         )
 
-    def get_all_with_schedules(self, hospital_id: UUID) -> List[Doctor]:
+    def get_all_with_schedules(self, hospital_id: UUID) -> list[Doctor]:
         return (
             self.db.query(Doctor)
             .options(
@@ -35,14 +36,14 @@ class DoctorRepository(BaseRepository[Doctor]):
             .filter(
                 Doctor.hospital_id == hospital_id,
                 Doctor.deleted_at.is_(None),
-                Doctor.is_available == True,
+                Doctor.is_available,
             )
             .all()
         )
 
     def get_by_specialization(
         self, hospital_id: UUID, specialization: str
-    ) -> List[Doctor]:
+    ) -> list[Doctor]:
         return (
             self.db.query(Doctor)
             .options(joinedload(Doctor.schedules))
@@ -56,13 +57,13 @@ class DoctorRepository(BaseRepository[Doctor]):
 
     def get_schedule_for_day(
         self, doctor_id: UUID, day: DayOfWeek
-    ) -> Optional[DoctorSchedule]:
+    ) -> DoctorSchedule | None:
         return (
             self.db.query(DoctorSchedule)
             .filter(
                 DoctorSchedule.doctor_id == doctor_id,
                 DoctorSchedule.day_of_week == day,
-                DoctorSchedule.is_active == True,
+                DoctorSchedule.is_active,
                 DoctorSchedule.deleted_at.is_(None),
             )
             .first()
@@ -70,7 +71,7 @@ class DoctorRepository(BaseRepository[Doctor]):
 
     def get_leave_for_date(
         self, doctor_id: UUID, leave_date: date
-    ) -> Optional[DoctorLeave]:
+    ) -> DoctorLeave | None:
         return (
             self.db.query(DoctorLeave)
             .filter(

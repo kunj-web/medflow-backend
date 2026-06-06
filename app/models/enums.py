@@ -1,14 +1,14 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     PATIENT = "patient"
     DOCTOR = "doctor"
     STAFF = "staff"
     ADMIN = "admin"
 
 
-class AppointmentStatus(str, Enum):
+class AppointmentStatus(StrEnum):
     SCHEDULED = "scheduled"
     CONFIRMED = "confirmed"
     IN_PROGRESS = "in_progress"
@@ -17,14 +17,14 @@ class AppointmentStatus(str, Enum):
     NO_SHOW = "no_show"
 
 
-class AppointmentType(str, Enum):
+class AppointmentType(StrEnum):
     CONSULTATION = "consultation"
     FOLLOW_UP = "follow_up"
     EMERGENCY = "emergency"
     PROCEDURE = "procedure"
 
 
-class InvoiceStatus(str, Enum):
+class InvoiceStatus(StrEnum):
     DRAFT = "draft"
     ISSUED = "issued"
     PAID = "paid"
@@ -32,7 +32,7 @@ class InvoiceStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class NotificationType(str, Enum):
+class NotificationType(StrEnum):
     APPOINTMENT_BOOKED = "appointment_booked"
     APPOINTMENT_CONFIRMED = "appointment_confirmed"
     APPOINTMENT_CANCELLED = "appointment_cancelled"
@@ -43,7 +43,7 @@ class NotificationType(str, Enum):
     GENERAL = "general"
 
 
-class DayOfWeek(str, Enum):
+class DayOfWeek(StrEnum):
     MONDAY = "monday"
     TUESDAY = "tuesday"
     WEDNESDAY = "wednesday"
@@ -53,7 +53,7 @@ class DayOfWeek(str, Enum):
     SUNDAY = "sunday"
 
 
-class BloodGroup(str, Enum):
+class BloodGroup(StrEnum):
     A_POS = "A+"
     A_NEG = "A-"
     B_POS = "B+"
@@ -65,7 +65,7 @@ class BloodGroup(str, Enum):
     UNKNOWN = "unknown"
 
 
-class Gender(str, Enum):
+class Gender(StrEnum):
     MALE = "male"
     FEMALE = "female"
     OTHER = "other"

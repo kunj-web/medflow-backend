@@ -7,11 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_role
 from app.models.enums import UserRole
-from app.models.user import User
 from app.models.hospital import Hospital, HospitalFeature
+from app.models.user import User
 from app.schemas.hospital import (
-    FeatureToggle,
     FeatureResponse,
+    FeatureToggle,
     HospitalResponse,
     HospitalUpdate,
 )

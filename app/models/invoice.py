@@ -1,9 +1,10 @@
-from sqlalchemy import Column, Numeric, Text, ForeignKey, Index, DateTime, String
+import sqlalchemy as sa
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+
 from app.db.base import BaseModel, HospitalScopedMixin
 from app.models.enums import InvoiceStatus
-import sqlalchemy as sa
 
 
 class Invoice(BaseModel, HospitalScopedMixin):

@@ -1,5 +1,5 @@
-from app.routers.auth import router as auth_router
 from app.routers.appointments import router as appointments_router
+from app.routers.auth import router as auth_router
 from app.routers.config import router as config_router
 from app.routers.doctors import router as doctors_router
 from app.routers.hospital_admin import router as hospital_admin_router

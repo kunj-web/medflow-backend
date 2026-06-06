@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
-from app.models.enums import AppointmentStatus, InvoiceStatus
 from app.models.appointment import Appointment
+from app.models.enums import AppointmentStatus, InvoiceStatus
 from app.models.invoice import Invoice
 from app.schemas.invoice import (
     InvoiceCreate,
@@ -94,7 +93,7 @@ class BillingService:
             raise ValueError(f"Invoice is already {invoice.status.value}")
 
         invoice.status = InvoiceStatus.ISSUED
-        invoice.issued_at = datetime.now(timezone.utc)
+        invoice.issued_at = datetime.now(UTC)
         self.db.commit()
         self.db.refresh(invoice)
         return self._to_response(invoice)
@@ -137,7 +136,7 @@ class BillingService:
 
         if invoice.balance_due <= 0:
             invoice.status = InvoiceStatus.PAID
-            invoice.paid_at = datetime.now(timezone.utc)
+            invoice.paid_at = datetime.now(UTC)
             invoice.balance_due = 0.0
 
         self.db.commit()
@@ -171,8 +170,8 @@ class BillingService:
         self,
         hospital_id: UUID,
         params: PaginationParams,
-        patient_id: Optional[UUID] = None,
-        status: Optional[InvoiceStatus] = None,
+        patient_id: UUID | None = None,
+        status: InvoiceStatus | None = None,
     ) -> PaginatedResponse[InvoiceResponse]:
         q = self.db.query(Invoice).filter(
             Invoice.hospital_id == hospital_id,
@@ -211,8 +210,8 @@ class BillingService:
         the current year for this hospital. This is safe under normal load;
         for high-concurrency environments consider a Postgres SEQUENCE instead.
         """
-        year = datetime.now(timezone.utc).year
-        year_start = datetime(year, 1, 1, tzinfo=timezone.utc)
+        year = datetime.now(UTC).year
+        year_start = datetime(year, 1, 1, tzinfo=UTC)
 
         count = (
             self.db.query(func.count(Invoice.id))
@@ -244,7 +243,7 @@ class BillingService:
             raise LookupError("Invoice not found")
         return invoice
 
-    def _get_invoice_by_appointment(self, appointment_id: UUID) -> Optional[Invoice]:
+    def _get_invoice_by_appointment(self, appointment_id: UUID) -> Invoice | None:
         return (
             self.db.query(Invoice)
             .filter(

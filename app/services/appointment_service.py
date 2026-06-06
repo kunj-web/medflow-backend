@@ -1,13 +1,14 @@
+from datetime import timedelta
 from uuid import UUID
-from datetime import datetime, timedelta
-from typing import List
+
 from sqlalchemy.orm import Session
+
+from app.models.appointment import Appointment
+from app.models.enums import AppointmentStatus, DayOfWeek, NotificationType
 from app.repositories.appointment_repo import AppointmentRepository
 from app.repositories.doctor_repo import DoctorRepository
 from app.repositories.notification_repo import NotificationRepository
-from app.models.appointment import Appointment
-from app.models.enums import AppointmentStatus, DayOfWeek, NotificationType
-from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentReschedule
+from app.schemas.appointment import AppointmentCreate, AppointmentReschedule
 
 
 class AppointmentService:

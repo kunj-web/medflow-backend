@@ -1,10 +1,10 @@
-from uuid import UUID
-from sqlalchemy.orm import Session, joinedload
-from app.models.user import User
-from app.models.patient import Patient
+from sqlalchemy.orm import Session
+
+from app.core.security import create_token_pair, decode_token, hash_password, verify_password
 from app.models.hospital import Hospital
-from app.core.security import hash_password, verify_password, create_token_pair, decode_token
-from app.schemas.auth import RegisterRequest, LoginRequest
+from app.models.patient import Patient
+from app.models.user import User
+from app.schemas.auth import LoginRequest, RegisterRequest
 
 
 class AuthService:

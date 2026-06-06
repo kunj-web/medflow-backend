@@ -1,9 +1,9 @@
-from sqlalchemy import Column, String, Boolean, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID
+import sqlalchemy as sa
+from sqlalchemy import Boolean, Column, Index, String
 from sqlalchemy.orm import relationship
+
 from app.db.base import BaseModel, HospitalScopedMixin
 from app.models.enums import UserRole
-import sqlalchemy as sa
 
 
 class User(BaseModel, HospitalScopedMixin):

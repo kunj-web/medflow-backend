@@ -1,7 +1,9 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from app.core.dependencies import get_db, CurrentUser
+
+from app.core.dependencies import CurrentUser, get_db
 from app.repositories.notification_repo import NotificationRepository
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])

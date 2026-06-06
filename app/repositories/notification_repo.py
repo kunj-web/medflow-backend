@@ -1,8 +1,9 @@
 from uuid import UUID
-from typing import List
+
 from sqlalchemy.orm import Session
-from app.repositories.base import BaseRepository
+
 from app.models.notification import Notification, UserDevice
+from app.repositories.base import BaseRepository
 
 
 class NotificationRepository(BaseRepository[Notification]):
@@ -11,13 +12,13 @@ class NotificationRepository(BaseRepository[Notification]):
 
     def get_user_notifications(
         self, user_id: UUID, unread_only: bool = False, limit: int = 50
-    ) -> List[Notification]:
+    ) -> list[Notification]:
         query = self.db.query(Notification).filter(
             Notification.user_id == user_id,
             Notification.deleted_at.is_(None),
         )
         if unread_only:
-            query = query.filter(Notification.is_read == False)
+            query = query.filter(not Notification.is_read)
 
         return query.order_by(Notification.created_at.desc()).limit(limit).all()
 
@@ -26,7 +27,7 @@ class NotificationRepository(BaseRepository[Notification]):
             self.db.query(Notification)
             .filter(
                 Notification.user_id == user_id,
-                Notification.is_read == False,
+                not Notification.is_read,
                 Notification.deleted_at.is_(None),
             )
             .count()
@@ -37,19 +38,19 @@ class NotificationRepository(BaseRepository[Notification]):
             self.db.query(Notification)
             .filter(
                 Notification.user_id == user_id,
-                Notification.is_read == False,
+                not Notification.is_read,
             )
             .update({"is_read": True})
         )
         self.db.flush()
         return updated
 
-    def get_user_devices(self, user_id: UUID) -> List[UserDevice]:
+    def get_user_devices(self, user_id: UUID) -> list[UserDevice]:
         return (
             self.db.query(UserDevice)
             .filter(
                 UserDevice.user_id == user_id,
-                UserDevice.is_active == True,
+                UserDevice.is_active,
             )
             .all()
         )

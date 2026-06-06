@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, get_current_user, require_role
+from app.core.dependencies import get_current_user, get_db, require_role
 from app.models.enums import DayOfWeek, UserRole
 from app.models.user import User
-from app.services.doctor_service import DoctorService
 from app.schemas.doctor import (
     DoctorCreate,
-    DoctorUpdate,
     DoctorResponse,
+    DoctorUpdate,
     LeaveCreate,
     LeaveResponse,
     ScheduleCreate,
@@ -22,6 +20,7 @@ from app.schemas.doctor import (
     SlotResponse,
 )
 from app.schemas.pagination import PaginatedResponse, PaginationParams
+from app.services.doctor_service import DoctorService
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
 
@@ -55,7 +54,7 @@ def create_doctor(
     try:
         return service.create(_hospital_id(current_user), payload)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.get(
@@ -64,7 +63,7 @@ def create_doctor(
     summary="List doctors",
 )
 def list_doctors(
-    specialization: Optional[str] = Query(None),
+    specialization: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -87,7 +86,7 @@ def get_doctor(
     try:
         return service.get_by_id(_hospital_id(current_user), doctor_id)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.put(
@@ -104,7 +103,7 @@ def update_doctor(
     try:
         return service.update(_hospital_id(current_user), doctor_id, payload)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.delete(
@@ -120,7 +119,7 @@ def delete_doctor(
     try:
         service.delete(_hospital_id(current_user), doctor_id)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +140,7 @@ def get_slots(
     try:
         return service.get_slots(_hospital_id(current_user), doctor_id, date)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # ---------------------------------------------------------------------------
@@ -163,9 +162,9 @@ def set_schedule(
     try:
         return service.set_schedule(_hospital_id(current_user), doctor_id, payload)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
 
 
 @router.delete(
@@ -182,7 +181,7 @@ def delete_schedule(
     try:
         service.delete_schedule(_hospital_id(current_user), doctor_id, day)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # ---------------------------------------------------------------------------
@@ -204,9 +203,9 @@ def add_leave(
     try:
         return service.add_leave(_hospital_id(current_user), doctor_id, payload)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.delete(
@@ -223,4 +222,4 @@ def cancel_leave(
     try:
         service.cancel_leave(_hospital_id(current_user), doctor_id, leave_date)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e

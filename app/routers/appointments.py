@@ -1,19 +1,20 @@
-from uuid import UUID
 from datetime import date
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
 from app.core.dependencies import get_db, require_role
 from app.models.enums import UserRole
-from app.services.appointment_service import AppointmentService
 from app.repositories.appointment_repo import AppointmentRepository
 from app.schemas.appointment import (
-    AppointmentCreate,
-    AppointmentResponse,
-    AppointmentReschedule,
     AppointmentCancel,
-    AppointmentUpdate,
+    AppointmentCreate,
+    AppointmentReschedule,
+    AppointmentResponse,
 )
 from app.schemas.pagination import PaginatedResponse
+from app.services.appointment_service import AppointmentService
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
@@ -42,7 +43,7 @@ def book_appointment(
             user_id=UUID(current_user["user_id"]),
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.get("/", response_model=PaginatedResponse[AppointmentResponse])
@@ -114,7 +115,7 @@ def cancel_appointment(
             cancelled_by_user_id=UUID(current_user["user_id"]),
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post("/{appointment_id}/reschedule", response_model=AppointmentResponse)
@@ -134,4 +135,4 @@ def reschedule_appointment(
             user_id=UUID(current_user["user_id"]),
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e

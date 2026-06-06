@@ -1,17 +1,18 @@
-from uuid import UUID
 from datetime import date, datetime
-from typing import List, Optional
+from uuid import UUID
+
 from sqlalchemy.orm import Session, joinedload
-from app.repositories.base import BaseRepository, PaginatedResult
+
 from app.models.appointment import Appointment
 from app.models.enums import AppointmentStatus
+from app.repositories.base import BaseRepository, PaginatedResult
 
 
 class AppointmentRepository(BaseRepository[Appointment]):
     def __init__(self, db: Session):
         super().__init__(Appointment, db)
 
-    def get_by_id_with_relations(self, id: UUID) -> Optional[Appointment]:
+    def get_by_id_with_relations(self, id: UUID) -> Appointment | None:
         return (
             self.db.query(Appointment)
             .options(
@@ -28,7 +29,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
 
     def get_doctor_appointments_for_date(
         self, doctor_id: UUID, date: date
-    ) -> List[Appointment]:
+    ) -> list[Appointment]:
         """Used for slot availability and queue management."""
         return (
             self.db.query(Appointment)
@@ -49,7 +50,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
 
     def get_slot_if_taken(
         self, doctor_id: UUID, slot_time: datetime
-    ) -> Optional[Appointment]:
+    ) -> Appointment | None:
         """Check for double booking."""
         return (
             self.db.query(Appointment)
@@ -67,7 +68,7 @@ class AppointmentRepository(BaseRepository[Appointment]):
 
     def get_hospital_queue_for_date(
         self, hospital_id: UUID, date: date
-    ) -> List[Appointment]:
+    ) -> list[Appointment]:
         """Today's queue for staff dashboard."""
         return (
             self.db.query(Appointment)
