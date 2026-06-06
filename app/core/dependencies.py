@@ -1,9 +1,12 @@
-from typing import Generator, Annotated
+from collections.abc import Generator
+from typing import Annotated
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
+
 from app.core.security import decode_token
+from app.db.session import SessionLocal
 from app.models.enums import UserRole
 
 bearer_scheme = HTTPBearer()

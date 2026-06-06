@@ -1,12 +1,13 @@
 from uuid import UUID
+
 from pydantic import BaseModel, EmailStr, field_validator
+
 from app.models.enums import UserRole
 from app.schemas.validators import (
     validate_indian_phone,
-    validate_password_strength,
     validate_non_empty_string,
+    validate_password_strength,
 )
-
 
 # ─── Request Schemas ──────────────────────────────────────────────────────────
 

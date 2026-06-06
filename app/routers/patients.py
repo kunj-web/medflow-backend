@@ -1,23 +1,22 @@
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, get_current_user, require_role
+from app.core.dependencies import get_current_user, get_db, require_role
 from app.models.enums import UserRole
 from app.models.user import User
-from app.services.patient_service import PatientService
+from app.schemas.appointment import AppointmentResponse
+from app.schemas.pagination import PaginatedResponse, PaginationParams
 from app.schemas.patient import (
     PatientCreate,
-    PatientUpdate,
     PatientResponse,
+    PatientUpdate,
     PatientWithAppointmentsResponse,
 )
-from app.schemas.pagination import PaginatedResponse, PaginationParams
-from app.schemas.appointment import AppointmentResponse
+from app.services.patient_service import PatientService
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
@@ -60,7 +59,7 @@ def create_patient(
     summary="List patients with optional search (admin / staff)",
 )
 def list_patients(
-    search: Optional[str] = Query(None, description="Search by name or phone"),
+    search: str | None = Query(None, description="Search by name or phone"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.STAFF)),

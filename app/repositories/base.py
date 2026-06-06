@@ -1,8 +1,10 @@
-from typing import Generic, TypeVar, Type, Optional, List
+from datetime import UTC, datetime
+from typing import Generic, TypeVar
 from uuid import UUID
-from datetime import datetime, timezone
-from sqlalchemy.orm import Session
+
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
 from app.db.base import BaseModel as DBBaseModel
 
 ModelType = TypeVar("ModelType", bound=DBBaseModel)
@@ -20,11 +22,11 @@ class PaginatedResult:
 
 
 class BaseRepository(Generic[ModelType]):
-    def __init__(self, model: Type[ModelType], db: Session):
+    def __init__(self, model: type[ModelType], db: Session):
         self.model = model
         self.db = db
 
-    def get_by_id(self, id: UUID) -> Optional[ModelType]:
+    def get_by_id(self, id: UUID) -> ModelType | None:
         return (
             self.db.query(self.model)
             .filter(
@@ -81,6 +83,6 @@ class BaseRepository(Generic[ModelType]):
         return obj
 
     def soft_delete(self, obj: ModelType) -> ModelType:
-        obj.deleted_at = datetime.now(timezone.utc)
+        obj.deleted_at = datetime.now(UTC)
         self.db.flush()
         return obj

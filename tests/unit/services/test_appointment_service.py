@@ -1,17 +1,18 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
+
+from app.models.enums import AppointmentType, UserRole
+from app.schemas.appointment import AppointmentCreate
+from app.services.appointment_service import AppointmentService
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.patient_factory import PatientFactory
 from tests.factories.user_factory import UserFactory
-from app.services.appointment_service import AppointmentService
-from app.schemas.appointment import AppointmentCreate, AppointmentReschedule
-from app.models.enums import AppointmentType, UserRole
-
 
 # Monday 10 AM — doctors have schedule Mon-Sat 9-17
-VALID_SLOT = datetime(2025, 6, 2, 10, 0, 0, tzinfo=timezone.utc)   # Monday
-OUTSIDE_HOURS_SLOT = datetime(2025, 6, 2, 2, 0, 0, tzinfo=timezone.utc)  # 2 AM
-SUNDAY_SLOT = datetime(2025, 6, 1, 10, 0, 0, tzinfo=timezone.utc)  # Sunday
+VALID_SLOT = datetime(2025, 6, 2, 10, 0, 0, tzinfo=UTC)   # Monday
+OUTSIDE_HOURS_SLOT = datetime(2025, 6, 2, 2, 0, 0, tzinfo=UTC)  # 2 AM
+SUNDAY_SLOT = datetime(2025, 6, 1, 10, 0, 0, tzinfo=UTC)  # Sunday
 
 
 class TestAppointmentService:
@@ -94,9 +95,9 @@ class TestAppointmentService:
         service = AppointmentService(db)
 
         slots = [
-            datetime(2025, 6, 2, 10, 0, tzinfo=timezone.utc),
-            datetime(2025, 6, 2, 10, 15, tzinfo=timezone.utc),
-            datetime(2025, 6, 2, 10, 30, tzinfo=timezone.utc),
+            datetime(2025, 6, 2, 10, 0, tzinfo=UTC),
+            datetime(2025, 6, 2, 10, 15, tzinfo=UTC),
+            datetime(2025, 6, 2, 10, 30, tzinfo=UTC),
         ]
 
         for i, slot in enumerate(slots):

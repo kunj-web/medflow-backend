@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
-from typing import Optional
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
-from app.models.enums import DayOfWeek, UserRole
 from app.models.doctor import Doctor, DoctorLeave, DoctorSchedule
+from app.models.enums import DayOfWeek, UserRole
 from app.models.user import User
-from app.repositories.doctor_repo import DoctorRepository
 from app.repositories.appointment_repo import AppointmentRepository
+from app.repositories.doctor_repo import DoctorRepository
 from app.schemas.doctor import (
     DoctorCreate,
-    DoctorUpdate,
     DoctorResponse,
+    DoctorUpdate,
     LeaveCreate,
     LeaveResponse,
     ScheduleCreate,
@@ -85,7 +84,7 @@ class DoctorService:
         self,
         hospital_id: UUID,
         params: PaginationParams,
-        specialization: Optional[str] = None,
+        specialization: str | None = None,
     ) -> PaginatedResponse[DoctorResponse]:
         if specialization:
             doctors, total = self.doctor_repo.get_by_specialization(

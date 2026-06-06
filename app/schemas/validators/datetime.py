@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def validate_future_datetime(v: datetime) -> datetime:
-    if v <= datetime.now(timezone.utc):
+    if v <= datetime.now(UTC):
         raise ValueError("Datetime must be in the future")
 
     return v

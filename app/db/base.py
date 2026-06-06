@@ -1,9 +1,9 @@
 import uuid
-from datetime import datetime, timezone
-from sqlalchemy import Column, DateTime, ForeignKey
+from datetime import UTC, datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, declared_attr
-from sqlalchemy import func
 
 
 class Base(DeclarativeBase):
@@ -32,7 +32,7 @@ class SoftDeleteMixin:
         return self.deleted_at is not None
 
     def soft_delete(self):
-        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_at = datetime.now(UTC)
 
 
 class HospitalScopedMixin:

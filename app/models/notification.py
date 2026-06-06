@@ -1,9 +1,10 @@
-from sqlalchemy import Column, String, Boolean, Text, ForeignKey, Index
+import sqlalchemy as sa
+from sqlalchemy import Boolean, Column, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+
 from app.db.base import BaseModel
 from app.models.enums import NotificationType
-import sqlalchemy as sa
 
 
 class Notification(BaseModel):

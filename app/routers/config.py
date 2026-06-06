@@ -1,17 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
-from app.core.dependencies import get_db
-from app.models.hospital import Hospital, HospitalFeature
-from pydantic import BaseModel
-from typing import Optional, Dict
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session, joinedload
+
+from app.core.dependencies import get_db
+from app.models.hospital import Hospital
 
 router = APIRouter(prefix="/config", tags=["Config"])
 
 
 class HospitalConfigResponse(BaseModel):
     hospital: dict
-    features: Dict[str, bool]
+    features: dict[str, bool]
 
     model_config = {"from_attributes": True}
 
@@ -28,7 +29,7 @@ def get_hospital_config(hospital_id: UUID, db: Session = Depends(get_db)):
         .options(joinedload(Hospital.features))
         .filter(
             Hospital.id == hospital_id,
-            Hospital.is_active == True,
+            Hospital.is_active,
             Hospital.deleted_at.is_(None),
         )
         .first()

@@ -28,7 +28,6 @@ from app.schemas.appointment import (
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
-
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
@@ -41,7 +40,6 @@ from app.schemas.auth import (
 # ---------------------------------------------------------------------------
 # Doctor
 # ---------------------------------------------------------------------------
-
 from app.schemas.doctor import (
     DoctorCreate,
     DoctorResponse,
@@ -56,7 +54,6 @@ from app.schemas.doctor import (
 # ---------------------------------------------------------------------------
 # Hospital
 # ---------------------------------------------------------------------------
-
 from app.schemas.hospital import (
     FeatureResponse,
     FeatureToggle,
@@ -67,7 +64,6 @@ from app.schemas.hospital import (
 # ---------------------------------------------------------------------------
 # Invoice
 # ---------------------------------------------------------------------------
-
 from app.schemas.invoice import (
     InvoiceCreate,
     InvoiceLineItem,
@@ -78,7 +74,6 @@ from app.schemas.invoice import (
 # ---------------------------------------------------------------------------
 # Notification
 # ---------------------------------------------------------------------------
-
 from app.schemas.notification import (
     DeviceRegisterRequest,
     DeviceRegisterResponse,
@@ -89,7 +84,6 @@ from app.schemas.notification import (
 # ---------------------------------------------------------------------------
 # Pagination
 # ---------------------------------------------------------------------------
-
 from app.schemas.pagination import (
     PaginatedResponse,
     PaginationParams,
@@ -98,7 +92,6 @@ from app.schemas.pagination import (
 # ---------------------------------------------------------------------------
 # Patient
 # ---------------------------------------------------------------------------
-
 from app.schemas.patient import (
     PatientCreate,
     PatientResponse,

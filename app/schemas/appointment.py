@@ -1,14 +1,14 @@
-from uuid import UUID
 from datetime import datetime
-from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel, field_validator
+
 from app.models.enums import AppointmentStatus, AppointmentType
 from app.schemas.validators import (
-    validate_slot_time,
-    validate_non_empty_string,
     validate_cancellation_reason,
+    validate_non_empty_string,
+    validate_slot_time,
 )
-
 
 # ─── Nested Brief Schemas (embedded inside responses) ─────────────────────────
 
@@ -33,7 +33,7 @@ class AppointmentCreate(BaseModel):
     doctor_id: UUID
     slot_time: datetime
     type: AppointmentType = AppointmentType.CONSULTATION
-    chief_complaint: Optional[str] = None
+    chief_complaint: str | None = None
 
     @field_validator("slot_time")
     @classmethod
@@ -49,9 +49,9 @@ class AppointmentCreate(BaseModel):
 
 
 class AppointmentUpdate(BaseModel):
-    status: Optional[AppointmentStatus] = None
-    notes: Optional[str] = None
-    end_time: Optional[datetime] = None
+    status: AppointmentStatus | None = None
+    notes: str | None = None
+    end_time: datetime | None = None
 
     @field_validator("notes")
     @classmethod
@@ -72,7 +72,7 @@ class AppointmentCancel(BaseModel):
 
 class AppointmentReschedule(BaseModel):
     new_slot_time: datetime
-    reason: Optional[str] = None
+    reason: str | None = None
 
     @field_validator("new_slot_time")
     @classmethod
@@ -93,13 +93,13 @@ class AppointmentResponse(BaseModel):
     id: UUID
     hospital_id: UUID
     slot_time: datetime
-    end_time: Optional[datetime]
+    end_time: datetime | None
     status: AppointmentStatus
     type: AppointmentType
-    chief_complaint: Optional[str]
-    notes: Optional[str]
-    cancellation_reason: Optional[str]
-    token_number: Optional[int]
+    chief_complaint: str | None
+    notes: str | None
+    cancellation_reason: str | None
+    token_number: int | None
     doctor: DoctorBrief
     patient: PatientBrief
     created_at: datetime

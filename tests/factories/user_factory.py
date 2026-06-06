@@ -1,8 +1,10 @@
-from faker import Faker
 from uuid import UUID
-from app.models.user import User
-from app.models.enums import UserRole
+
+from faker import Faker
+
 from app.core.security import hash_password
+from app.models.enums import UserRole
+from app.models.user import User
 
 fake = Faker("en_IN")
 

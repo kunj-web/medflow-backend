@@ -1,11 +1,12 @@
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-from app.db.base import Base
-from app.core.dependencies import get_db
+
 from app.core.config import settings
+from app.core.dependencies import get_db
+from app.db.base import Base
+from app.main import app
 
 # ─── Engine ───────────────────────────────────────────────────────────────────
 
@@ -68,9 +69,9 @@ def hospital(db):
 
 @pytest.fixture
 def admin_headers(db, hospital):
-    from tests.factories.user_factory import UserFactory
-    from app.models.enums import UserRole
     from app.core.security import create_token_pair
+    from app.models.enums import UserRole
+    from tests.factories.user_factory import UserFactory
     user = UserFactory.create(db, hospital.id, role=UserRole.ADMIN)
     tokens = create_token_pair(str(user.id), "admin", str(hospital.id))
     return {"Authorization": f"Bearer {tokens['access_token']}"}
@@ -78,10 +79,10 @@ def admin_headers(db, hospital):
 
 @pytest.fixture
 def doctor_headers(db, hospital):
-    from tests.factories.user_factory import UserFactory
-    from tests.factories.doctor_factory import DoctorFactory
-    from app.models.enums import UserRole
     from app.core.security import create_token_pair
+    from app.models.enums import UserRole
+    from tests.factories.doctor_factory import DoctorFactory
+    from tests.factories.user_factory import UserFactory
     user = UserFactory.create(db, hospital.id, role=UserRole.DOCTOR)
     doctor = DoctorFactory.create(db, hospital.id, user_id=user.id)
     tokens = create_token_pair(str(user.id), "doctor", str(hospital.id))
@@ -90,10 +91,10 @@ def doctor_headers(db, hospital):
 
 @pytest.fixture
 def patient_headers(db, hospital):
-    from tests.factories.user_factory import UserFactory
-    from tests.factories.patient_factory import PatientFactory
-    from app.models.enums import UserRole
     from app.core.security import create_token_pair
+    from app.models.enums import UserRole
+    from tests.factories.patient_factory import PatientFactory
+    from tests.factories.user_factory import UserFactory
     user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
     patient = PatientFactory.create(db, hospital.id, user_id=user.id)
     tokens = create_token_pair(str(user.id), "patient", str(hospital.id))

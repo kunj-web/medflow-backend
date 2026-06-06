@@ -17,14 +17,14 @@ from app.schemas.validators.datetime import (
     validate_slot_time,
 )
 
-# Phone
-from app.schemas.validators.phone import (
-    validate_indian_phone,
-)
-
 # Password
 from app.schemas.validators.password import (
     validate_password_strength,
+)
+
+# Phone
+from app.schemas.validators.phone import (
+    validate_indian_phone,
 )
 
 __all__ = [

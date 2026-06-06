@@ -1,9 +1,10 @@
-from sqlalchemy import Column, String, Numeric, Boolean, Time, ForeignKey, Index, Text
+import sqlalchemy as sa
+from sqlalchemy import Boolean, Column, ForeignKey, Index, Numeric, String, Text, Time
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+
 from app.db.base import BaseModel, HospitalScopedMixin
 from app.models.enums import DayOfWeek
-import sqlalchemy as sa
 
 
 class Doctor(BaseModel, HospitalScopedMixin):

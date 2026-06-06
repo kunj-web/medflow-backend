@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -9,16 +8,16 @@ from app.core.security import hash_password
 from app.models.enums import UserRole
 from app.models.patient import Patient
 from app.models.user import User
-from app.repositories.base import BaseRepository
 from app.repositories.appointment_repo import AppointmentRepository
+from app.repositories.base import BaseRepository
 from app.schemas.appointment import AppointmentResponse
+from app.schemas.pagination import PaginatedResponse, PaginationParams
 from app.schemas.patient import (
     PatientCreate,
-    PatientUpdate,
     PatientResponse,
+    PatientUpdate,
     PatientWithAppointmentsResponse,
 )
-from app.schemas.pagination import PaginatedResponse, PaginationParams
 
 
 class PatientRepository(BaseRepository[Patient]):
@@ -27,7 +26,7 @@ class PatientRepository(BaseRepository[Patient]):
     def __init__(self, db: Session) -> None:
         super().__init__(db, Patient)
 
-    def get_by_phone(self, hospital_id: UUID, phone: str) -> Optional[Patient]:
+    def get_by_phone(self, hospital_id: UUID, phone: str) -> Patient | None:
         return (
             self.db.query(Patient)
             .filter(
@@ -38,7 +37,7 @@ class PatientRepository(BaseRepository[Patient]):
             .first()
         )
 
-    def get_by_id_full(self, patient_id: UUID) -> Optional[Patient]:
+    def get_by_id_full(self, patient_id: UUID) -> Patient | None:
         from sqlalchemy.orm import joinedload
         return (
             self.db.query(Patient)
@@ -51,7 +50,7 @@ class PatientRepository(BaseRepository[Patient]):
         self,
         hospital_id: UUID,
         params: PaginationParams,
-        query: Optional[str] = None,
+        query: str | None = None,
     ) -> tuple[list[Patient], int]:
         q = self.db.query(Patient).filter(
             Patient.hospital_id == hospital_id,
@@ -141,7 +140,7 @@ class PatientService:
         self,
         hospital_id: UUID,
         params: PaginationParams,
-        search: Optional[str] = None,
+        search: str | None = None,
     ) -> PaginatedResponse[PatientResponse]:
         patients, total = self.patient_repo.search(hospital_id, params, search)
         items = [PatientResponse.model_validate(p) for p in patients]

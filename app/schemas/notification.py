@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, field_validator
 
 from app.models.enums import NotificationType
 from app.schemas.validators.common import validate_non_empty_string
-
 
 # ---------------------------------------------------------------------------
 # Notification
@@ -20,10 +19,10 @@ class NotificationResponse(BaseModel):
     type: NotificationType
     title: str
     body: str
-    data: Optional[dict[str, Any]]     # arbitrary JSON payload (e.g. appointment_id)
+    data: dict[str, Any] | None     # arbitrary JSON payload (e.g. appointment_id)
     is_read: bool
     created_at: datetime
-    read_at: Optional[datetime]
+    read_at: datetime | None
 
     model_config = {"from_attributes": True}
 

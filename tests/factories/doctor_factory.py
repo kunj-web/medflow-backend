@@ -1,10 +1,11 @@
-from faker import Faker
-from uuid import UUID
 from datetime import time
+from uuid import UUID
+
+from faker import Faker
+
 from app.models.doctor import Doctor, DoctorSchedule
-from app.models.enums import DayOfWeek
+from app.models.enums import DayOfWeek, UserRole
 from tests.factories.user_factory import UserFactory
-from app.models.enums import UserRole
 
 fake = Faker("en_IN")
 
