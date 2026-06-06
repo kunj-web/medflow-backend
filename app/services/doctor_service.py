@@ -97,7 +97,7 @@ class DoctorService:
             )
         items = [DoctorResponse.model_validate(d) for d in doctors]
         return PaginatedResponse(
-            items=items,
+            data=items,
             total=total,
             page=params.page,
             page_size=params.page_size,
@@ -253,7 +253,7 @@ class DoctorService:
         booked_appointments = self.appointment_repo.get_doctor_appointments_for_date(
             doctor_id, target_date
         )
-        taken: set[datetime] = {appt.scheduled_at for appt in booked_appointments}
+        taken: set[datetime] = {appt.slot_time for appt in booked_appointments}
 
         # Generate slots
         slots: list[SlotResponse] = []
