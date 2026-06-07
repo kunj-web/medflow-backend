@@ -18,7 +18,7 @@ class NotificationRepository(BaseRepository[Notification]):
             Notification.deleted_at.is_(None),
         )
         if unread_only:
-            query = query.filter(not Notification.is_read)
+            query = query.filter(Notification.is_read == False)
 
         return query.order_by(Notification.created_at.desc()).limit(limit).all()
 
@@ -27,7 +27,7 @@ class NotificationRepository(BaseRepository[Notification]):
             self.db.query(Notification)
             .filter(
                 Notification.user_id == user_id,
-                not Notification.is_read,
+                Notification.is_read == False,
                 Notification.deleted_at.is_(None),
             )
             .count()
@@ -38,7 +38,7 @@ class NotificationRepository(BaseRepository[Notification]):
             self.db.query(Notification)
             .filter(
                 Notification.user_id == user_id,
-                not Notification.is_read,
+                Notification.is_read == False,
             )
             .update({"is_read": True})
         )
@@ -50,7 +50,7 @@ class NotificationRepository(BaseRepository[Notification]):
             self.db.query(UserDevice)
             .filter(
                 UserDevice.user_id == user_id,
-                UserDevice.is_active,
+                UserDevice.is_active == True,
             )
             .all()
         )

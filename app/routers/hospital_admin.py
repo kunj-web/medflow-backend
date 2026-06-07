@@ -15,20 +15,17 @@ from app.schemas.hospital import (
     HospitalResponse,
     HospitalUpdate,
 )
+from app.services.storage_service import storage_service
 
 router = APIRouter(prefix="/admin/hospital", tags=["hospital admin"])
 
-ALLOWED_LOGO_TYPES = {"image/png", "image/jpeg", "image/webp", "image/svg+xml"}
+ALLOWED_LOGO_TYPES = {"image/png", "image/jpeg"}
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def get_db_session(db: Session = Depends(get_db)) -> Session:
-    return db
-
 
 def _get_hospital_or_404(db: Session, hospital_id: UUID) -> Hospital:
     hospital = (
@@ -41,6 +38,26 @@ def _get_hospital_or_404(db: Session, hospital_id: UUID) -> Hospital:
     return hospital
 
 
+def _extract_object_key(logo_url: str) -> str | None:
+    """
+    Derive the S3 object key from a Supabase public URL.
+
+    URL format:
+        {SUPABASE_URL}/storage/v1/object/public/{BUCKET}/{object_key}
+
+    Returns the object_key portion, or None if the URL is malformed.
+    """
+    marker = "/object/public/"
+    idx = logo_url.find(marker)
+    if idx == -1:
+        return None
+    after_marker = logo_url[idx + len(marker):]
+    slash = after_marker.find("/")
+    if slash == -1:
+        return None
+    return after_marker[slash + 1:]
+
+
 # ---------------------------------------------------------------------------
 # Read
 # ---------------------------------------------------------------------------
@@ -51,7 +68,7 @@ def _get_hospital_or_404(db: Session, hospital_id: UUID) -> Hospital:
     summary="Get hospital config (admin only)",
 )
 def get_hospital(
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
     return HospitalResponse.model_validate(
@@ -70,7 +87,7 @@ def get_hospital(
 )
 def update_hospital(
     payload: HospitalUpdate,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
     hospital = _get_hospital_or_404(db, UUID(current_user["hospital_id"]))
@@ -95,46 +112,63 @@ def update_hospital(
 @router.post(
     "/logo",
     response_model=HospitalResponse,
-    summary="Upload a hospital logo to Cloudflare R2 (admin only)",
+    summary="Upload or replace the hospital logo (admin only)",
 )
 async def upload_logo(
     file: UploadFile = File(...),
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    # Validate content type
-    if file.content_type not in ALLOWED_LOGO_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Unsupported file type '{file.content_type}'. "
-                   f"Allowed: {', '.join(ALLOWED_LOGO_TYPES)}",
-        )
+    hospital_id = UUID(current_user["hospital_id"])
+    hospital = _get_hospital_or_404(db, hospital_id)
 
-    contents = await file.read()
-    if len(contents) > MAX_LOGO_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Logo must be under 2 MB",
-        )
+    # Delete the old logo from storage if one exists.
+    # Done before upload so an extension change (PNG → JPEG) doesn't
+    # leave an orphan file in the bucket.
+    if hospital.logo_url:
+        old_key = _extract_object_key(hospital.logo_url)
+        if old_key:
+            storage_service.delete_file(old_key)
 
-    # Upload via storage_service (imported lazily to keep router thin)
-    try:
-        from app.services.storage_service import StorageService
-        storage = StorageService()
-        logo_url = await storage.upload_logo(
-            hospital_id=UUID(current_user["hospital_id"]),
-            data=contents,
-            content_type=file.content_type,
-            filename=file.filename or "logo",
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Logo upload failed: {exc}",
-        )
+    # upload_logo validates MIME type and size, raises HTTPException on failure
+    logo_url = await storage_service.upload_logo(
+        hospital_id=str(hospital_id),
+        file=file,
+    )
 
-    hospital = _get_hospital_or_404(db, UUID(current_user["hospital_id"]))
     hospital.logo_url = logo_url
+    db.commit()
+    db.refresh(hospital)
+    return HospitalResponse.model_validate(hospital)
+
+
+# ---------------------------------------------------------------------------
+# Logo delete
+# ---------------------------------------------------------------------------
+
+@router.delete(
+    "/logo",
+    response_model=HospitalResponse,
+    summary="Delete the hospital logo (admin only)",
+)
+def delete_logo(
+    current_user: dict = Depends(require_role(UserRole.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    hospital_id = UUID(current_user["hospital_id"])
+    hospital = _get_hospital_or_404(db, hospital_id)
+
+    if not hospital.logo_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No logo is currently set for this hospital.",
+        )
+
+    object_key = _extract_object_key(hospital.logo_url)
+    if object_key:
+        storage_service.delete_file(object_key)
+
+    hospital.logo_url = None
     db.commit()
     db.refresh(hospital)
     return HospitalResponse.model_validate(hospital)
@@ -151,7 +185,7 @@ async def upload_logo(
 )
 def toggle_feature(
     payload: FeatureToggle,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
     feature = (
