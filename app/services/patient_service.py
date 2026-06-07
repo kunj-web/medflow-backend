@@ -99,7 +99,7 @@ class PatientService:
             role=UserRole.PATIENT,
             phone=payload.phone,
             email=payload.email,
-            password_hash=hash_password(payload.password),
+            hashed_password=hash_password(payload.password),
         )
         self.db.add(user)
         self.db.flush()

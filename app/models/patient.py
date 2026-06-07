@@ -1,11 +1,9 @@
 import sqlalchemy as sa
-from sqlalchemy import Column, Date, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, Column, Date, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-
 from app.db.base import BaseModel, HospitalScopedMixin
 from app.models.enums import BloodGroup, Gender
-
 
 class Patient(BaseModel, HospitalScopedMixin):
     __tablename__ = "patients"
@@ -13,26 +11,25 @@ class Patient(BaseModel, HospitalScopedMixin):
         Index("ix_patient_user_id", "user_id"),
         Index("ix_patient_hospital", "hospital_id"),
     )
-
     user_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
         unique=True,
     )
-    name = Column(String(255), nullable=False)
-    date_of_birth = Column(Date, nullable=True)
+    first_name = Column(String(255), nullable=False)
+    last_name = Column(String(255), nullable=False)
     gender = Column(sa.Enum(Gender), nullable=True)
-    blood_group = Column(sa.Enum(BloodGroup), default=BloodGroup.UNKNOWN)
-    address = Column(Text, nullable=True)
+    date_of_birth = Column(Date, nullable=True)
+    phone = Column(String(20), nullable=True)
+    email = Column(String(255), nullable=True)
+    blood_group = Column(sa.Enum(BloodGroup), nullable=True)
+    allergies = Column(Text, nullable=True)
+    existing_conditions = Column(Text, nullable=True)
     emergency_contact_name = Column(String(255), nullable=True)
     emergency_contact_phone = Column(String(20), nullable=True)
-    allergies = Column(Text, nullable=True)
-    medical_notes = Column(Text, nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="patient_profile", lazy="raise")
     hospital = relationship("Hospital", back_populates="patients", lazy="raise")
-    appointments = relationship(
-        "Appointment", back_populates="patient", lazy="raise"
-    )
+    appointments = relationship("Appointment", back_populates="patient", lazy="raise")

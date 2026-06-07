@@ -14,18 +14,16 @@ from app.schemas.validators import (
 
 class DoctorBrief(BaseModel):
     id: UUID
-    name: str
+    first_name: str
+    last_name: str
     specialization: str
-
     model_config = {"from_attributes": True}
-
 
 class PatientBrief(BaseModel):
     id: UUID
-    name: str
-
+    first_name: str
+    last_name: str
     model_config = {"from_attributes": True}
-
 
 # ─── Request Schemas ──────────────────────────────────────────────────────────
 

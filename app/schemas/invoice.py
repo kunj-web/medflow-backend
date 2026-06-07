@@ -11,7 +11,7 @@ from app.schemas.validators.common import validate_non_empty_string, validate_po
 # ---------------------------------------------------------------------------
 # Line items (embedded in invoice, not a separate DB table)
 # ---------------------------------------------------------------------------
-
+ 
 class InvoiceLineItem(BaseModel):
     description: str
     quantity: int = 1
