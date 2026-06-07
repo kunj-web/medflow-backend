@@ -30,7 +30,7 @@ class AppointmentService:
         if not doctor or str(doctor.hospital_id) != str(hospital_id):
             raise ValueError("Doctor not found in this hospital")
 
-        if not doctor.is_available:
+        if not doctor.is_active:
             raise ValueError("Doctor is not available for bookings")
 
         # 2. Check doctor works on this day
@@ -62,7 +62,7 @@ class AppointmentService:
         token_number = len(day_appointments) + 1
 
         # 7. Create appointment
-        end_time = data.slot_time + timedelta(minutes=doctor.avg_consultation_minutes)
+        end_time = data.slot_time + timedelta(minutes=15)
         appointment = self.appointment_repo.create({
             "hospital_id": hospital_id,
             "patient_id": patient_id,
@@ -81,7 +81,7 @@ class AppointmentService:
             "appointment_id": appointment.id,
             "type": NotificationType.APPOINTMENT_BOOKED,
             "title": "Appointment Confirmed",
-            "message": f"Your appointment with Dr. {doctor.name} is scheduled for {data.slot_time.strftime('%d %b %Y at %I:%M %p')}",
+            "message": f"Your appointment with Dr. {doctor.first_name} {doctor.last_name} is scheduled for {data.slot_time.strftime('%d %b %Y at %I:%M %p')}",
             "data": {"appointment_id": str(appointment.id)},
         })
 

@@ -123,14 +123,14 @@ class BillingService:
         if invoice.status == InvoiceStatus.CANCELLED:
             raise ValueError("Cannot accept payment for a cancelled invoice")
 
-        if round(payload.amount_paid, 2) > round(invoice.balance_due, 2):
+        if round(payload.amount_paid, 2) > round(float(invoice.balance_due), 2):
             raise ValueError(
                 f"Payment amount {payload.amount_paid} exceeds balance due "
                 f"{invoice.balance_due}"
             )
 
-        invoice.amount_paid = round(invoice.amount_paid + payload.amount_paid, 2)
-        invoice.balance_due = round(invoice.total_amount - invoice.amount_paid, 2)
+        invoice.amount_paid = round(float(invoice.amount_paid) + float(payload.amount_paid), 2)
+        invoice.balance_due = round(float(invoice.total_amount) - float(invoice.amount_paid), 2)
         invoice.payment_method = payload.payment_method
         invoice.transaction_reference = payload.transaction_reference
 

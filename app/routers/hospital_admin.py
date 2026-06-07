@@ -55,7 +55,7 @@ def get_hospital(
     db: Session = Depends(get_db),
 ):
     return HospitalResponse.model_validate(
-        _get_hospital_or_404(db, current_user.hospital_id)
+        _get_hospital_or_404(db, UUID(current_user["hospital_id"]))
     )
 
 
@@ -73,7 +73,7 @@ def update_hospital(
     current_user: User = Depends(require_role(UserRole.ADMIN)),
     db: Session = Depends(get_db),
 ):
-    hospital = _get_hospital_or_404(db, current_user.hospital_id)
+    hospital = _get_hospital_or_404(db, UUID(current_user["hospital_id"]))
     update_data = payload.model_dump(exclude_unset=True)
 
     # logo_url is set only via the /logo endpoint — never accepted here
@@ -122,7 +122,7 @@ async def upload_logo(
         from app.services.storage_service import StorageService
         storage = StorageService()
         logo_url = await storage.upload_logo(
-            hospital_id=current_user.hospital_id,
+            hospital_id=UUID(current_user["hospital_id"]),
             data=contents,
             content_type=file.content_type,
             filename=file.filename or "logo",
@@ -133,7 +133,7 @@ async def upload_logo(
             detail=f"Logo upload failed: {exc}",
         )
 
-    hospital = _get_hospital_or_404(db, current_user.hospital_id)
+    hospital = _get_hospital_or_404(db, UUID(current_user["hospital_id"]))
     hospital.logo_url = logo_url
     db.commit()
     db.refresh(hospital)
@@ -157,7 +157,7 @@ def toggle_feature(
     feature = (
         db.query(HospitalFeature)
         .filter(
-            HospitalFeature.hospital_id == current_user.hospital_id,
+            HospitalFeature.hospital_id == UUID(current_user["hospital_id"]),
             HospitalFeature.feature_key == payload.feature_key,
         )
         .first()
@@ -167,7 +167,7 @@ def toggle_feature(
         feature.is_enabled = payload.is_enabled
     else:
         feature = HospitalFeature(
-            hospital_id=current_user.hospital_id,
+            hospital_id=UUID(current_user["hospital_id"]),
             feature_key=payload.feature_key,
             is_enabled=payload.is_enabled,
         )

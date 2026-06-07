@@ -34,3 +34,5 @@ factory-boy==3.3.0
 
 # Dev utilities
 python-dotenv==1.0.1
+
+argon2-cffi==23.1.0

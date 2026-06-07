@@ -50,7 +50,7 @@ class DoctorService:
             role=UserRole.DOCTOR,
             phone=payload.phone,
             email=payload.email,
-            password_hash=hash_password(payload.password),
+            hashed_password=hash_password(payload.password),
         )
         self.db.add(user)
         self.db.flush()  # get user.id without committing
@@ -71,8 +71,9 @@ class DoctorService:
         )
         self.db.add(doctor)
         self.db.commit()
-        self.db.refresh(doctor)
-        return DoctorResponse.model_validate(doctor)
+        return DoctorResponse.model_validate(
+            self.doctor_repo.get_by_id_with_relations(doctor.id)
+    )
 
     def get_by_id(self, hospital_id: UUID, doctor_id: UUID) -> DoctorResponse:
         doctor = self.doctor_repo.get_by_id_with_relations(doctor_id)
@@ -150,7 +151,6 @@ class DoctorService:
 
         schedule = DoctorSchedule(
             doctor_id=doctor.id,
-            hospital_id=hospital_id,
             day_of_week=payload.day_of_week,
             start_time=payload.start_time,
             end_time=payload.end_time,

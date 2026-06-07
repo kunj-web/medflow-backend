@@ -27,9 +27,8 @@ router = APIRouter(prefix="/patients", tags=["patients"])
 def get_service(db: Session = Depends(get_db)) -> PatientService:
     return PatientService(db)
 
-
-def _hospital_id(current_user: User) -> UUID:
-    return current_user.hospital_id
+def _hospital_id(current_user: dict) -> UUID:
+    return UUID(current_user["hospital_id"])
 
 
 # ---------------------------------------------------------------------------

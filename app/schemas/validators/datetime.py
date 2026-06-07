@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 
 def validate_future_datetime(v: datetime) -> datetime:
-    if v <= datetime.now(UTC):
+    if v <= datetime.now(UTC).replace(tzinfo=None):
         raise ValueError("Datetime must be in the future")
 
     return v

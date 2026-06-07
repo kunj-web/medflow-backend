@@ -4,8 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel, HospitalScopedMixin
-from app.models.enums import DayOfWeek
-
+from app.models.enums import DayOfWeek, Gender
 
 class Doctor(BaseModel, HospitalScopedMixin):
     __tablename__ = "doctors"
@@ -13,32 +12,30 @@ class Doctor(BaseModel, HospitalScopedMixin):
         Index("ix_doctor_user_id", "user_id"),
         Index("ix_doctor_hospital_specialization", "hospital_id", "specialization"),
     )
-
     user_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
         unique=True,
     )
-    name = Column(String(255), nullable=False)
+    first_name = Column(String(255), nullable=False)
+    last_name = Column(String(255), nullable=False)
+    gender = Column(sa.Enum(Gender), nullable=False)
+    phone = Column(String(20), nullable=True)
+    email = Column(String(255), nullable=True)
     specialization = Column(String(255), nullable=False)
     qualification = Column(String(255), nullable=True)
-    bio = Column(Text, nullable=True)
+    registration_number = Column(String(100), nullable=True)
+    experience_years = Column(sa.Integer, default=0)
     consultation_fee = Column(Numeric(10, 2), nullable=False, default=0)
-    follow_up_fee = Column(Numeric(10, 2), nullable=True)
-    avg_consultation_minutes = Column(sa.Integer, default=15)
-    is_available = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True)
 
     # Relationships
     user = relationship("User", back_populates="doctor_profile", lazy="raise")
     hospital = relationship("Hospital", back_populates="doctors", lazy="raise")
-    schedules = relationship(
-        "DoctorSchedule", back_populates="doctor", lazy="raise"
-    )
+    schedules = relationship("DoctorSchedule", back_populates="doctor", lazy="raise")
     leaves = relationship("DoctorLeave", back_populates="doctor", lazy="raise")
-    appointments = relationship(
-        "Appointment", back_populates="doctor", lazy="raise"
-    )
+    appointments = relationship("Appointment", back_populates="doctor", lazy="raise")
 
 
 class DoctorSchedule(BaseModel):
