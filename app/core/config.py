@@ -1,69 +1,51 @@
-from functools import lru_cache
-
-from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # ------------------------------------------------------------------
     # App
-    APP_NAME: str = "Hospital Platform"
-    APP_ENV: str = "development"
+    # ------------------------------------------------------------------
+    secret_key: str
+    app_env: str = "development"
 
-    SECRET_KEY: str
-
-    ALGORITHM: str = "HS256"
-
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
+    # ------------------------------------------------------------------
     # Database
-    DATABASE_URL: str
-    TEST_DATABASE_URL: str = ""
+    # ------------------------------------------------------------------
+    database_url: str
 
-    # Cloudflare R2
-    R2_ACCOUNT_ID: str = ""
-    R2_ACCESS_KEY_ID: str = ""
-    R2_SECRET_ACCESS_KEY: str = ""
-    R2_BUCKET_NAME: str = ""
-    R2_PUBLIC_URL: str = ""
+    # ------------------------------------------------------------------
+    # Supabase Storage (S3-compatible)
+    # ------------------------------------------------------------------
+    supabase_url: str                   # e.g. https://your-project-ref.supabase.co
+    supabase_s3_access_key: str
+    supabase_s3_secret_key: str
+    supabase_bucket_name: str = "hospital-assets"
 
-    # Email
-    RESEND_API_KEY: str = ""
-    EMAIL_FROM: str = "noreply@hospital.com"
+    # ------------------------------------------------------------------
+    # Email — Resend
+    # ------------------------------------------------------------------
+    resend_api_key: str
+    email_from: str
 
-    # Firebase
-    FIREBASE_CREDENTIALS_PATH: str = "firebase-credentials.json"
+    # ------------------------------------------------------------------
+    # Firebase Cloud Messaging
+    # ------------------------------------------------------------------
+    firebase_credentials_path: str = "firebase-credentials.json"
 
+    # ------------------------------------------------------------------
     # CORS
-    FRONTEND_URL: str = "http://localhost:3000"
-
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
-
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, value):
-        if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",")]
-        return value
+    # ------------------------------------------------------------------
+    frontend_url: str = "http://localhost:3000"
+    cors_origins: str = "http://localhost:3000"
 
     @property
-    def is_production(self) -> bool:
-        return self.APP_ENV == "production"
+    def cors_origins_list(self) -> list[str]:
+        """Split comma-separated CORS_ORIGINS into a list."""
+        return [origin.strip() for origin in self.cors_origins.split(",")]
 
-    @property
-    def is_testing(self) -> bool:
-        return self.APP_ENV == "testing"
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="ignore",
-    )
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
 
 
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
-
-
-settings = get_settings()
+settings = Settings()

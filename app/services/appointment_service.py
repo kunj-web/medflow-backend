@@ -4,11 +4,11 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
-from app.models.enums import AppointmentStatus, DayOfWeek, NotificationType
+from app.models.enums import AppointmentStatus, DayOfWeek
 from app.repositories.appointment_repo import AppointmentRepository
 from app.repositories.doctor_repo import DoctorRepository
-from app.repositories.notification_repo import NotificationRepository
 from app.schemas.appointment import AppointmentCreate, AppointmentReschedule
+from app.services.notification_service import notification_service
 
 
 class AppointmentService:
@@ -16,7 +16,6 @@ class AppointmentService:
         self.db = db
         self.appointment_repo = AppointmentRepository(db)
         self.doctor_repo = DoctorRepository(db)
-        self.notification_repo = NotificationRepository(db)
 
     def book(
         self,
@@ -75,20 +74,13 @@ class AppointmentService:
             "status": AppointmentStatus.SCHEDULED,
         })
 
-        # 8. Create notification (same transaction)
-        self.notification_repo.create({
-            "user_id": user_id,
-            "appointment_id": appointment.id,
-            "type": NotificationType.APPOINTMENT_BOOKED,
-            "title": "Appointment Confirmed",
-            "message": f"Your appointment with Dr. {doctor.first_name} {doctor.last_name} is scheduled for {data.slot_time.strftime('%d %b %Y at %I:%M %p')}",
-            "data": {"appointment_id": str(appointment.id)},
-        })
-
         self.db.commit()
 
-        # Return with relations loaded
-        return self.appointment_repo.get_by_id_with_relations(appointment.id)
+        # 8. Load relations then notify (push + email + DB record)
+        appointment = self.appointment_repo.get_by_id_with_relations(appointment.id)
+        notification_service.notify_appointment_booked(appointment, self.db)
+
+        return appointment
 
     def cancel(
         self,
@@ -113,18 +105,13 @@ class AppointmentService:
             "cancellation_reason": reason,
         })
 
-        # Notify patient
-        self.notification_repo.create({
-            "user_id": cancelled_by_user_id,
-            "appointment_id": appointment.id,
-            "type": NotificationType.APPOINTMENT_CANCELLED,
-            "title": "Appointment Cancelled",
-            "message": f"Your appointment has been cancelled. Reason: {reason}",
-            "data": {"appointment_id": str(appointment.id)},
-        })
-
         self.db.commit()
-        return self.appointment_repo.get_by_id_with_relations(appointment_id)
+
+        # Load relations then notify (push + email + DB record)
+        appointment = self.appointment_repo.get_by_id_with_relations(appointment_id)
+        notification_service.notify_appointment_cancelled(appointment, self.db)
+
+        return appointment
 
     def reschedule(
         self,
@@ -156,14 +143,9 @@ class AppointmentService:
             "status": AppointmentStatus.SCHEDULED,
         })
 
-        self.notification_repo.create({
-            "user_id": user_id,
-            "appointment_id": appointment.id,
-            "type": NotificationType.APPOINTMENT_RESCHEDULED,
-            "title": "Appointment Rescheduled",
-            "message": f"Your appointment has been rescheduled to {data.new_slot_time.strftime('%d %b %Y at %I:%M %p')}",
-            "data": {"appointment_id": str(appointment.id)},
-        })
-
         self.db.commit()
+
+        # Load relations then notify
+        # Note: no dedicated notify_appointment_rescheduled yet —
+        # add to notification_service when needed
         return self.appointment_repo.get_by_id_with_relations(appointment_id)
