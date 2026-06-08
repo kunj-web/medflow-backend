@@ -11,16 +11,13 @@ Covers:
 - Cannot issue a non-DRAFT invoice
 - Hospital scoping — invoice from other hospital not accessible
 """
-from decimal import Decimal
 
 import pytest
 
 from app.models.enums import InvoiceStatus
-from app.services.billing_service import BillingService
 from app.schemas.invoice import InvoiceCreate, PaymentCreate
-from tests.factories.doctor_factory import DoctorFactory
+from app.services.billing_service import BillingService
 from tests.factories.patient_factory import PatientFactory
-from tests.factories.user_factory import UserFactory
 
 
 def _make_invoice(db, hospital, patient=None, line_items=None):

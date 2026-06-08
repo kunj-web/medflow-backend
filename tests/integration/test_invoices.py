@@ -15,8 +15,6 @@ Covers:
 import pytest
 
 from tests.factories.patient_factory import PatientFactory
-from tests.factories.user_factory import UserFactory
-from app.models.enums import UserRole
 
 
 def _invoice_payload(patient_id: str) -> dict:

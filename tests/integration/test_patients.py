@@ -10,14 +10,12 @@ Covers:
 - Patient cannot access other patients
 - Get patient's own appointment history
 """
-import pytest
 
-from tests.factories.patient_factory import PatientFactory
-from tests.factories.doctor_factory import DoctorFactory
-from tests.factories.user_factory import UserFactory
 from app.core.security import create_token_pair
 from app.models.enums import UserRole
-
+from tests.factories.doctor_factory import DoctorFactory
+from tests.factories.patient_factory import PatientFactory
+from tests.factories.user_factory import UserFactory
 
 PATIENT_PAYLOAD = {
     "email": "newpatient@test.com",
@@ -130,7 +128,6 @@ class TestPatientDetail:
 class TestPatientAppointmentHistory:
 
     async def test_patient_appointment_history(self, client, db, hospital):
-        from datetime import datetime
         user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
         patient = PatientFactory.create(db, hospital.id, user_id=user.id)
         doctor = DoctorFactory.create(db, hospital.id)

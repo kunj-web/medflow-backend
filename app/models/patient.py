@@ -1,9 +1,11 @@
 import sqlalchemy as sa
-from sqlalchemy import Boolean, Column, Date, ForeignKey, Index, String, Text
+from sqlalchemy import Column, Date, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+
 from app.db.base import BaseModel, HospitalScopedMixin
 from app.models.enums import BloodGroup, Gender
+
 
 class Patient(BaseModel, HospitalScopedMixin):
     __tablename__ = "patients"

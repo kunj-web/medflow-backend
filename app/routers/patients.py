@@ -49,7 +49,7 @@ def create_patient(
     try:
         return service.create(_hospital_id(current_user), payload)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @router.get(
@@ -87,7 +87,7 @@ def get_patient(
             _hospital_id(current_user), patient_id
         )
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
     # Patients can only see themselves
     if current_user.role == UserRole.PATIENT:
@@ -116,7 +116,7 @@ def update_patient(
     try:
         return service.update(_hospital_id(current_user), patient_id, payload)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.delete(
@@ -132,7 +132,7 @@ def delete_patient(
     try:
         service.delete(_hospital_id(current_user), patient_id)
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 # ---------------------------------------------------------------------------
@@ -162,4 +162,4 @@ def get_appointment_history(
             _hospital_id(current_user), patient_id, params
         )
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
