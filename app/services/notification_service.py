@@ -6,14 +6,14 @@ from typing import Any
 
 import resend
 from firebase_admin import credentials, messaging
-from firebase_admin import initialize_app as firebase_initialize_app
 from firebase_admin import get_app as firebase_get_app
+from firebase_admin import initialize_app as firebase_initialize_app
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.appointment import Appointment
-from app.models.notification import Notification, UserDevice
 from app.models.enums import NotificationType
+from app.models.notification import Notification
 from app.repos.notification_repo import NotificationRepository
 
 logger = logging.getLogger(__name__)

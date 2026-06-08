@@ -6,6 +6,7 @@ from sqlalchemy.orm import relationship
 from app.db.base import BaseModel, HospitalScopedMixin
 from app.models.enums import DayOfWeek, Gender
 
+
 class Doctor(BaseModel, HospitalScopedMixin):
     __tablename__ = "doctors"
     __table_args__ = (

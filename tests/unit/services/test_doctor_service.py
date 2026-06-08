@@ -10,14 +10,12 @@ Covers:
 - Inactive doctor cannot be booked
 """
 from datetime import date, time
-from unittest.mock import patch
-from uuid import uuid4
 
 import pytest
 
 from app.models.enums import DayOfWeek, UserRole
-from app.services.doctor_service import DoctorService
 from app.schemas.doctor import DoctorCreate, ScheduleUpsert
+from app.services.doctor_service import DoctorService
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.user_factory import UserFactory
 
@@ -156,6 +154,7 @@ class TestDoctorLeave:
         Indirectly tests DoctorRepository.get_leave_for_date.
         """
         from datetime import datetime
+
         from app.models.doctor import DoctorLeave
         from app.models.enums import AppointmentType
         from app.schemas.appointment import AppointmentCreate
@@ -192,6 +191,7 @@ class TestDoctorLeave:
 
     def test_unapproved_leave_does_not_block(self, db, hospital):
         from datetime import datetime
+
         from app.models.doctor import DoctorLeave
         from app.models.enums import AppointmentType
         from app.schemas.appointment import AppointmentCreate
@@ -230,8 +230,9 @@ class TestDoctorHospitalScoping:
 
     def test_doctor_from_other_hospital_not_bookable(self, db, hospital):
         from datetime import datetime
-        from app.models.hospital import Hospital
+
         from app.models.enums import AppointmentType
+        from app.models.hospital import Hospital
         from app.schemas.appointment import AppointmentCreate
         from app.services.appointment_service import AppointmentService
         from tests.factories.patient_factory import PatientFactory
@@ -259,6 +260,7 @@ class TestDoctorHospitalScoping:
 
     def test_inactive_doctor_cannot_be_booked(self, db, hospital):
         from datetime import datetime
+
         from app.models.enums import AppointmentType
         from app.schemas.appointment import AppointmentCreate
         from app.services.appointment_service import AppointmentService

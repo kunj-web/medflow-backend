@@ -2,8 +2,10 @@ import sqlalchemy as sa
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
+
 from app.db.base import BaseModel, HospitalScopedMixin
 from app.models.enums import InvoiceStatus
+
 
 class Invoice(BaseModel, HospitalScopedMixin):
     __tablename__ = "invoices"

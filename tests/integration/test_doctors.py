@@ -11,13 +11,8 @@ Covers:
 - Schedule upsert
 - Get available slots
 """
-import pytest
 
 from tests.factories.doctor_factory import DoctorFactory
-from tests.factories.user_factory import UserFactory
-from app.core.security import create_token_pair
-from app.models.enums import UserRole
-
 
 DOCTOR_PAYLOAD = {
     "email": "dr.new@test.com",

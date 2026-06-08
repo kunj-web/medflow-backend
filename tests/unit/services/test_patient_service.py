@@ -11,8 +11,8 @@ Covers:
 import pytest
 
 from app.models.enums import UserRole
-from app.services.patient_service import PatientService
 from app.schemas.patient import PatientCreate
+from app.services.patient_service import PatientService
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.patient_factory import PatientFactory
 from tests.factories.user_factory import UserFactory
@@ -113,6 +113,7 @@ class TestPatientAppointmentHistory:
 
     def test_appointment_history_scoped_to_patient(self, db, hospital):
         from datetime import datetime
+
         from app.models.enums import AppointmentType
         from app.schemas.appointment import AppointmentCreate
         from app.services.appointment_service import AppointmentService
