@@ -19,10 +19,13 @@ class PatientFactory:
         patient = Patient(
             user_id=user_id,
             hospital_id=hospital_id,
-            name=kwargs.get("name", fake.name()),
+            first_name=kwargs.get("first_name", fake.first_name()),
+            last_name=kwargs.get("last_name", fake.last_name()),
+            phone=kwargs.get("phone", fake.numerify("##########")),
+            email=kwargs.get("email", fake.unique.email()),
             gender=kwargs.get("gender", Gender.MALE),
             blood_group=kwargs.get("blood_group", BloodGroup.O_POS),
-            address=kwargs.get("address", fake.address()),
+            existing_conditions=kwargs.get("existing_conditions", None),
         )
         db.add(patient)
         db.flush()

@@ -4,7 +4,7 @@ from uuid import UUID
 from faker import Faker
 
 from app.models.doctor import Doctor, DoctorSchedule
-from app.models.enums import DayOfWeek, UserRole
+from app.models.enums import DayOfWeek, Gender, UserRole
 from tests.factories.user_factory import UserFactory
 
 fake = Faker("en_IN")
@@ -25,28 +25,32 @@ class DoctorFactory:
         doctor = Doctor(
             user_id=user_id,
             hospital_id=hospital_id,
-            name=kwargs.get("name", f"Dr. {fake.name()}"),
+            first_name=kwargs.get("first_name", fake.first_name()),
+            last_name=kwargs.get("last_name", fake.last_name()),
+            gender=kwargs.get("gender", Gender.MALE),
+            phone=kwargs.get("phone", fake.numerify("##########")),
+            email=kwargs.get("email", fake.unique.email()),
+            registration_number=kwargs.get("registration_number", fake.unique.numerify("REG#####")),
             specialization=kwargs.get("specialization", fake.random_element(SPECIALIZATIONS)),
             consultation_fee=kwargs.get("consultation_fee", 500),
-            avg_consultation_minutes=kwargs.get("avg_consultation_minutes", 15),
-            is_available=kwargs.get("is_available", True),
+            experience_years=kwargs.get("experience_years", 5),
+            is_active=kwargs.get("is_active", True),
         )
         db.add(doctor)
         db.flush()
 
-        # Add a default Monday-Saturday schedule
+        # Default Monday–Saturday schedule 09:00–17:00
         for day in [
             DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
             DayOfWeek.THURSDAY, DayOfWeek.FRIDAY, DayOfWeek.SATURDAY,
         ]:
-            schedule = DoctorSchedule(
+            db.add(DoctorSchedule(
                 doctor_id=doctor.id,
+                hospital_id=hospital_id,
                 day_of_week=day,
                 start_time=time(9, 0),
                 end_time=time(17, 0),
-                slot_duration_minutes=15,
-            )
-            db.add(schedule)
+            ))
 
         db.flush()
         return doctor
