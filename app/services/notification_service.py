@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.models.appointment import Appointment
 from app.models.enums import NotificationType
 from app.models.notification import Notification
-from app.repos.notification_repo import NotificationRepository
+from app.repositories.notification_repo import NotificationRepository
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +23,24 @@ logger = logging.getLogger(__name__)
 # Firebase initialisation — runs once at import time
 # ---------------------------------------------------------------------------
 
+import os
+
 def _init_firebase() -> None:
-    """Initialise Firebase Admin SDK if not already done."""
+    """Initialize Firebase only if credentials file exists."""
+    if not os.path.exists(settings.firebase_credentials_path):
+        logger.warning(
+            "Firebase credentials not found (%s). Push notifications disabled.",
+            settings.firebase_credentials_path,
+        )
+        return
+
     try:
         firebase_get_app()
     except ValueError:
         cred = credentials.Certificate(settings.firebase_credentials_path)
         firebase_initialize_app(cred)
 
-
-_init_firebase()
+# _init_firebase()
 
 
 # ---------------------------------------------------------------------------

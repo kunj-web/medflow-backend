@@ -14,21 +14,28 @@ class Settings(BaseSettings):
     database_url: str
 
     # ------------------------------------------------------------------
-    # Supabase Storage (S3-compatible)
+    # JWT
     # ------------------------------------------------------------------
-    supabase_url: str                   # e.g. https://your-project-ref.supabase.co
-    supabase_s3_access_key: str
-    supabase_s3_secret_key: str
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+
+    # ------------------------------------------------------------------
+    # Supabase Storage (S3-compatible) — optional until storage is wired
+    # ------------------------------------------------------------------
+    supabase_url: str | None = None
+    supabase_s3_access_key: str | None = None
+    supabase_s3_secret_key: str | None = None
     supabase_bucket_name: str = "hospital-assets"
 
     # ------------------------------------------------------------------
-    # Email — Resend
+    # Email — Resend — optional until notifications are wired
     # ------------------------------------------------------------------
-    resend_api_key: str
-    email_from: str
+    resend_api_key: str | None = None
+    email_from: str | None = None
 
     # ------------------------------------------------------------------
-    # Firebase Cloud Messaging
+    # Firebase Cloud Messaging — optional until notifications are wired
     # ------------------------------------------------------------------
     firebase_credentials_path: str = "firebase-credentials.json"
 
