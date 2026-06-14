@@ -7,8 +7,6 @@ from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
-ALGORITHM = "HS256"
-
 
 # ─── Password ────────────────────────────────────────────────────────────────
 
@@ -25,24 +23,24 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_access_token(payload: dict) -> str:
     data = payload.copy()
     expire = datetime.now(UTC) + timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        minutes=settings.access_token_expire_minutes
     )
     data.update({"exp": expire, "type": "access"})
-    return jwt.encode(data, settings.SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(data, settings.secret_key, algorithm=settings.algorithm)
 
 
 def create_refresh_token(payload: dict) -> str:
     data = payload.copy()
     expire = datetime.now(UTC) + timedelta(
-        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+        days=settings.refresh_token_expire_days
     )
     data.update({"exp": expire, "type": "refresh"})
-    return jwt.encode(data, settings.SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(data, settings.secret_key, algorithm=settings.algorithm)
 
 
 def decode_token(token: str) -> dict | None:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         return payload
     except JWTError:
         return None
