@@ -8,10 +8,19 @@ from app.models.enums import InvoiceStatus
 
 
 class Invoice(BaseModel, HospitalScopedMixin):
+    """
+    hospital_id (via HospitalScopedMixin) is a SNAPSHOT, copied from
+    appointment.hospital_id at invoice-creation time in BillingService.
+    Never updated afterward — preserves which hospital this financial
+    record actually belongs to, even if the doctor later changes
+    affiliation. Nullable because clinic-based appointments have none.
+    """
+
     __tablename__ = "invoices"
     __table_args__ = (
         Index("ix_invoice_appointment", "appointment_id"),
-        Index("ix_invoice_hospital_status", "hospital_id", "status"),
+        Index("ix_invoice_status", "status"),
+        Index("ix_invoice_hospital", "hospital_id"),
     )
     appointment_id = Column(
         UUID(as_uuid=True),
@@ -44,3 +53,4 @@ class Invoice(BaseModel, HospitalScopedMixin):
 
     # Relationships
     appointment = relationship("Appointment", back_populates="invoice", lazy="raise")
+    

@@ -3,15 +3,14 @@ from sqlalchemy import Column, Date, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.db.base import BaseModel, HospitalScopedMixin
+from app.db.base import BaseModel
 from app.models.enums import BloodGroup, Gender
 
 
-class Patient(BaseModel, HospitalScopedMixin):
+class Patient(BaseModel):
     __tablename__ = "patients"
     __table_args__ = (
         Index("ix_patient_user_id", "user_id"),
-        Index("ix_patient_hospital", "hospital_id"),
     )
     user_id = Column(
         UUID(as_uuid=True),
@@ -33,5 +32,5 @@ class Patient(BaseModel, HospitalScopedMixin):
 
     # Relationships
     user = relationship("User", back_populates="patient_profile", lazy="raise")
-    hospital = relationship("Hospital", back_populates="patients", lazy="raise")
+    
     appointments = relationship("Appointment", back_populates="patient", lazy="raise")

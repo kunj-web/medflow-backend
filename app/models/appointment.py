@@ -8,14 +8,23 @@ from app.models.enums import AppointmentStatus, AppointmentType
 
 
 class Appointment(BaseModel, HospitalScopedMixin):
+    """
+    hospital_id (via HospitalScopedMixin) is a SNAPSHOT, not a live
+    relationship. It is copied from doctor.hospital_id at booking time
+    in AppointmentService.book() and never updated afterward — even if
+    the doctor later changes hospital affiliation. This preserves
+    historical accuracy for reporting (e.g. "revenue by hospital").
+    Nullable because clinic-based doctors have no hospital.
+    """
+
     __tablename__ = "appointments"
     __table_args__ = (
-        # Most common query: all appointments for a hospital on a given day
-        Index("ix_appointment_hospital_slot", "hospital_id", "slot_time"),
-        # Doctor's schedule view
+        # Doctor's schedule view / double-booking check
         Index("ix_appointment_doctor_status", "doctor_id", "status"),
         # Patient's appointment history
         Index("ix_appointment_patient", "patient_id"),
+        # Historical reporting by hospital (nullable, sparse index is fine)
+        Index("ix_appointment_hospital", "hospital_id"),
         # Prevent double booking same doctor at same slot
         sa.UniqueConstraint(
             "doctor_id", "slot_time",
@@ -59,3 +68,4 @@ class Appointment(BaseModel, HospitalScopedMixin):
     notifications = relationship(
         "Notification", back_populates="appointment", lazy="raise"
     )
+    
