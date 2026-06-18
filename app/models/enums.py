@@ -5,7 +5,22 @@ class UserRole(StrEnum):
     PATIENT = "patient"
     DOCTOR = "doctor"
     STAFF = "staff"
-    ADMIN = "admin"
+    WEBSITE_ADMIN = "website_admin"
+
+
+class AccountStatus(StrEnum):
+    """
+    Single source of truth for account approval/lifecycle state.
+    Lives only on User — Doctor/Patient never duplicate this.
+    """
+    PENDING = "pending"
+    ACTIVE = "active"
+    REJECTED = "rejected"
+
+
+class WorkType(StrEnum):
+    HOSPITAL = "hospital"
+    CLINIC = "clinic"
 
 
 class AppointmentStatus(StrEnum):
@@ -70,3 +85,4 @@ class Gender(StrEnum):
     FEMALE = "female"
     OTHER = "other"
     PREFER_NOT_TO_SAY = "prefer_not_to_say"
+    

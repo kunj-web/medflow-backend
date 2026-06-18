@@ -36,14 +36,23 @@ class SoftDeleteMixin:
 
 
 class HospitalScopedMixin:
-    """Every tenant-scoped model must include hospital_id."""
+    """
+    Adds an optional hospital_id FK.
+
+    NOTE: As of the marketplace model, hospital_id is nullable everywhere.
+    It no longer represents a tenancy boundary — it represents an
+    affiliation (Doctor) or a historical snapshot (Appointment, Invoice).
+    Do not filter queries by hospital_id as a security/isolation boundary;
+    that responsibility now lives entirely in auth/ownership checks
+    (current_user["user_id"], doctor.user_id, patient.user_id, etc).
+    """
 
     @declared_attr
     def hospital_id(cls):
         return Column(
             UUID(as_uuid=True),
-            ForeignKey("hospitals.id", ondelete="RESTRICT"),
-            nullable=False,
+            ForeignKey("hospitals.id", ondelete="SET NULL"),
+            nullable=True,
             index=True,
         )
 
