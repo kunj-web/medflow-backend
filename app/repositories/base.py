@@ -44,15 +44,34 @@ class BaseRepository(Generic[ModelType]):
 
     def get_all_paginated(
         self,
-        hospital_id: UUID,
         page: int = 1,
         page_size: int = 20,
+        hospital_id: UUID | None = None,
         filters: list = None,
     ) -> PaginatedResult:
+        """
+        hospital_id is now an OPTIONAL filter, not a mandatory tenancy
+        boundary. Under the marketplace model, hospital_id is nullable
+        (or absent entirely) on most models — it's a historical/
+        affiliation field, not an isolation boundary. Pass it only when
+        you specifically want to scope results to one hospital (e.g.
+        admin reviewing appointments at a specific hospital for
+        reporting). If the model has no hospital_id column at all
+        (User, Patient), passing hospital_id will raise AttributeError —
+        callers must not pass it for those repos.
+        """
         query = self.db.query(self.model).filter(
-            self.model.hospital_id == hospital_id,
             self.model.deleted_at.is_(None),
         )
+
+        if hospital_id is not None:
+            if not hasattr(self.model, "hospital_id"):
+                raise ValueError(
+                    f"{self.model.__name__} has no hospital_id column — "
+                    "cannot filter by hospital_id"
+                )
+            query = query.filter(self.model.hospital_id == hospital_id)
+
         if filters:
             for f in filters:
                 query = query.filter(f)
@@ -86,3 +105,4 @@ class BaseRepository(Generic[ModelType]):
         obj.deleted_at = datetime.now(UTC)
         self.db.flush()
         return obj
+    
