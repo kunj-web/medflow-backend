@@ -21,6 +21,7 @@ from app.models.doctor import (
     DoctorSchedule,
 )
 from app.models.enums import (
+    AccountStatus,
     AppointmentStatus,
     AppointmentType,
     BloodGroup,
@@ -29,6 +30,7 @@ from app.models.enums import (
     InvoiceStatus,
     NotificationType,
     UserRole,
+    WorkType,
 )
 
 # Hospital
@@ -51,6 +53,7 @@ from app.models.user import User
 
 __all__ = [
     # Enums
+    "AccountStatus",
     "AppointmentStatus",
     "AppointmentType",
     "BloodGroup",
@@ -59,6 +62,7 @@ __all__ = [
     "InvoiceStatus",
     "NotificationType",
     "UserRole",
+    "WorkType",
 
     # Hospital
     "Hospital",
