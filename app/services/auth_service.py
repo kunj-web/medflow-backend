@@ -1,11 +1,7 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.security import (
-    create_token_pair,
-    decode_token,
-    hash_password,
-    verify_password,
-)
+from app.core.security import create_token_pair, decode_token, hash_password, verify_password
 from app.models.doctor import Doctor
 from app.models.enums import AccountStatus, UserRole, WorkType
 from app.models.hospital import Hospital
@@ -27,14 +23,10 @@ class AuthService:
         bypass approval entirely.
         """
         # Email is globally unique now — no hospital_id to disambiguate
-        existing = (
-            self.db.query(User)
-            .filter(
-                User.email == data.email,
-                User.deleted_at.is_(None),
-            )
-            .first()
-        )
+        existing = self.db.query(User).filter(
+            User.email == data.email,
+            User.deleted_at.is_(None),
+        ).first()
         if existing:
             raise ValueError("Email already registered")
 
@@ -45,15 +37,11 @@ class AuthService:
             and data.work_type == WorkType.HOSPITAL
             and data.hospital_id is not None
         ):
-            hospital = (
-                self.db.query(Hospital)
-                .filter(
-                    Hospital.id == data.hospital_id,
-                    Hospital.is_active == True,  # noqa: E712
-                    Hospital.deleted_at.is_(None),
-                )
-                .first()
-            )
+            hospital = self.db.query(Hospital).filter(
+                Hospital.id == data.hospital_id,
+                Hospital.is_active == True,  # noqa: E712
+                Hospital.deleted_at.is_(None),
+            ).first()
             if not hospital:
                 raise ValueError("Selected hospital not found or inactive")
 
@@ -72,7 +60,25 @@ class AuthService:
             status=initial_status,
         )
         self.db.add(user)
-        self.db.flush()
+
+        try:
+            self.db.flush()
+        except IntegrityError:
+            self.db.rollback()
+            # Catches the soft-delete edge case: the application-level
+            # duplicate check above only excludes ACTIVE rows with this
+            # email, but the DB-level unique index on users.email is
+            # currently NOT partial (doesn't exclude soft-deleted rows)
+            # — see migration TODO (Phase 4): index should become
+            # UNIQUE(email) WHERE deleted_at IS NULL. Until then, a
+            # soft-deleted user's email cannot actually be reused, even
+            # though app logic implies it should be. The IntegrityError
+            # fires HERE at flush (the INSERT), not at the later commit
+            # — this try/except must wrap the flush, not the commit.
+            raise ValueError(
+                "Email already registered. If you previously had an "
+                "account with this email, contact support."
+            )
 
         if data.role == UserRole.PATIENT:
             name_parts = data.name.strip().split(" ", 1)
@@ -114,9 +120,7 @@ class AuthService:
                 else:
                     doctor_kwargs["pending_hospital_name"] = data.pending_hospital_name
                     doctor_kwargs["pending_hospital_city"] = data.pending_hospital_city
-                    doctor_kwargs["pending_hospital_state"] = (
-                        data.pending_hospital_state
-                    )
+                    doctor_kwargs["pending_hospital_state"] = data.pending_hospital_state
 
             elif data.work_type == WorkType.CLINIC:
                 doctor_kwargs["clinic_name"] = data.clinic_name
@@ -133,7 +137,7 @@ class AuthService:
             "Registration successful. You can now log in."
             if initial_status == AccountStatus.ACTIVE
             else "Registration submitted. Your account is pending approval "
-            "by a website admin. You will be able to log in once approved."
+                 "by a website admin. You will be able to log in once approved."
         )
 
         return {
@@ -144,14 +148,10 @@ class AuthService:
         }
 
     def login(self, data: LoginRequest) -> dict:
-        user = (
-            self.db.query(User)
-            .filter(
-                User.email == data.email,
-                User.deleted_at.is_(None),
-            )
-            .first()
-        )
+        user = self.db.query(User).filter(
+            User.email == data.email,
+            User.deleted_at.is_(None),
+        ).first()
 
         if not user or not verify_password(data.password, user.hashed_password):
             raise ValueError("Invalid email or password")
@@ -191,14 +191,10 @@ class AuthService:
         if not user_id:
             raise ValueError("Invalid refresh token")
 
-        user = (
-            self.db.query(User)
-            .filter(
-                User.id == user_id,
-                User.deleted_at.is_(None),
-            )
-            .first()
-        )
+        user = self.db.query(User).filter(
+            User.id == user_id,
+            User.deleted_at.is_(None),
+        ).first()
 
         if not user:
             raise ValueError("User not found")
@@ -215,3 +211,4 @@ class AuthService:
             status=user.status.value,
             is_super_admin=user.is_super_admin,
         )
+    

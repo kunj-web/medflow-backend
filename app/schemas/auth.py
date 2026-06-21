@@ -10,7 +10,6 @@ from app.schemas.validators import (
 
 # ─── Request Schemas ─────────────────────────────────────────────────────
 
-
 class RegisterRequest(BaseModel):
     # --- Common fields (all roles) ---
     email: EmailStr
@@ -72,13 +71,53 @@ class RegisterRequest(BaseModel):
             )
         return v
 
+    @staticmethod
+    def _is_provided(value) -> bool:
+        """
+        Consistent 'was this field actually provided' check across the
+        whole validator. None -> not provided. Empty/whitespace-only
+        string -> not provided (a sloppy frontend sending "" should not
+        count as real data). Non-string falsy values like 0 -> provided
+        (0 is a legitimate value for e.g. experience_years).
+        """
+        if value is None:
+            return False
+        if isinstance(value, str) and value.strip() == "":
+            return False
+        return True
+
     @model_validator(mode="after")
     def validate_doctor_fields(self):
+        doctor_only_fields = {
+            "specialization": self.specialization,
+            "qualification": self.qualification,
+            "registration_number": self.registration_number,
+            "experience_years": self.experience_years,
+            "work_type": self.work_type,
+            "gender": self.gender,
+            "hospital_id": self.hospital_id,
+            "pending_hospital_name": self.pending_hospital_name,
+            "pending_hospital_city": self.pending_hospital_city,
+            "pending_hospital_state": self.pending_hospital_state,
+            "clinic_name": self.clinic_name,
+            "clinic_city": self.clinic_city,
+            "clinic_address": self.clinic_address,
+        }
+
         if self.role != UserRole.DOCTOR:
+            # Patients (or any non-doctor role) must not submit any
+            # doctor-only field. Silently ignoring these would hide
+            # client bugs — reject explicitly instead.
+            provided = [k for k, v in doctor_only_fields.items() if self._is_provided(v)]
+            if provided:
+                raise ValueError(
+                    f"Fields not applicable to role '{self.role.value}': "
+                    f"{', '.join(provided)}"
+                )
             return self
 
         # Required doctor fields regardless of work_type
-        if not self.specialization:
+        if not self._is_provided(self.specialization):
             raise ValueError("specialization is required for doctor registration")
         if self.work_type is None:
             raise ValueError("work_type is required for doctor registration")
@@ -87,20 +126,55 @@ class RegisterRequest(BaseModel):
 
         if self.work_type == WorkType.HOSPITAL:
             has_existing = self.hospital_id is not None
-            has_manual = bool(self.pending_hospital_name)
+            manual_fields_provided = [
+                f for f in (
+                    self.pending_hospital_name,
+                    self.pending_hospital_city,
+                    self.pending_hospital_state,
+                )
+                if self._is_provided(f)
+            ]
+            has_manual = len(manual_fields_provided) > 0
+
             if not has_existing and not has_manual:
                 raise ValueError(
                     "Select a hospital from the dropdown or enter one manually"
                 )
             if has_existing and has_manual:
                 raise ValueError(
-                    "Provide either hospital_id OR pending_hospital_name, not both"
+                    "Provide either hospital_id OR pending_hospital_* fields, "
+                    "not both"
+                )
+            if has_manual and not self._is_provided(self.pending_hospital_name):
+                raise ValueError(
+                    "pending_hospital_name is required when entering a "
+                    "hospital manually"
+                )
+            # Clinic fields must not be present for a hospital-based doctor
+            if (
+                self._is_provided(self.clinic_name)
+                or self._is_provided(self.clinic_city)
+                or self._is_provided(self.clinic_address)
+            ):
+                raise ValueError(
+                    "clinic_* fields are not applicable when work_type is 'hospital'"
                 )
 
         elif self.work_type == WorkType.CLINIC:
-            if not self.clinic_name or not self.clinic_city:
+            if not self._is_provided(self.clinic_name) or not self._is_provided(self.clinic_city):
                 raise ValueError(
                     "clinic_name and clinic_city are required for clinic-based doctors"
+                )
+            # Hospital fields must not be present for a clinic-based doctor
+            if (
+                self.hospital_id is not None
+                or self._is_provided(self.pending_hospital_name)
+                or self._is_provided(self.pending_hospital_city)
+                or self._is_provided(self.pending_hospital_state)
+            ):
+                raise ValueError(
+                    "hospital_id and pending_hospital_* fields are not applicable "
+                    "when work_type is 'clinic'"
                 )
 
         return self
@@ -112,7 +186,6 @@ class LoginRequest(BaseModel):
     so there is no hospital_id to disambiguate against — email is globally
     unique.
     """
-
     email: EmailStr
     password: str
 
@@ -143,7 +216,6 @@ class ChangePasswordRequest(BaseModel):
 
 # ─── Response Schemas ────────────────────────────────────────────────────
 
-
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
@@ -160,11 +232,8 @@ class RegisterResponse(BaseModel):
     Returned by /register instead of tokens. Registration never issues
     a token — patients still need to log in separately (matches the
     original "redirect to /login" flow), and doctors/pending accounts
-    must not receive a usable token before approval. See auth_service
-    bug history: a PENDING doctor was previously handed a fully valid
-    access token at registration, bypassing approval entirely.
+    must not receive a usable token before approval.
     """
-
     user_id: str
     role: str
     status: str
@@ -176,3 +245,4 @@ class MeResponse(BaseModel):
     role: str
     status: str
     is_super_admin: bool = False
+    
