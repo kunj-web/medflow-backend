@@ -111,9 +111,9 @@ class PatientResponse(BaseModel):
     user_id: UUID
     first_name: str
     last_name: str
-    gender: Gender
-    date_of_birth: date
-    phone: str
+    gender: Gender | None
+    date_of_birth: date | None
+    phone: str | None
     email: str | None
     blood_group: BloodGroup | None
     allergies: str | None

@@ -6,11 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db, require_role
+from app.core.dependencies import get_db, require_active_status, require_role
 from app.models.enums import DayOfWeek, UserRole
-from app.models.user import User
 from app.schemas.doctor import (
-    DoctorCreate,
     DoctorResponse,
     DoctorUpdate,
     LeaveCreate,
@@ -24,202 +22,169 @@ from app.services.doctor_service import DoctorService
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def get_service(db: Session = Depends(get_db)) -> DoctorService:
     return DoctorService(db)
 
 
-def _hospital_id(current_user: dict) -> UUID:
-    return UUID(current_user["hospital_id"])
+def _actor(current_user: dict) -> tuple[UUID, bool]:
+    return (
+        UUID(current_user["user_id"]),
+        current_user["role"] == UserRole.WEBSITE_ADMIN.value,
+    )
 
 
-# ---------------------------------------------------------------------------
-# CRUD
-# ---------------------------------------------------------------------------
-
-@router.post(
-    "",
-    response_model=DoctorResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a doctor (admin only)",
-)
-def create_doctor(
-    payload: DoctorCreate,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
-    service: DoctorService = Depends(get_service),
-):
-    try:
-        return service.create(_hospital_id(current_user), payload)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
-
-
-@router.get(
-    "",
-    response_model=PaginatedResponse[DoctorResponse],
-    summary="List doctors",
-)
+@router.get("", response_model=PaginatedResponse[DoctorResponse])
 def list_doctors(
     specialization: str | None = Query(None),
+    hospital_id: UUID | None = Query(None),
+    city: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
     service: DoctorService = Depends(get_service),
 ):
-    params = PaginationParams(page=page, page_size=page_size)
-    return service.list_all(_hospital_id(current_user), params, specialization)
+    return service.list_public(
+        PaginationParams(page=page, page_size=page_size),
+        specialization,
+        hospital_id,
+        city,
+    )
 
 
-@router.get(
-    "/{doctor_id}",
-    response_model=DoctorResponse,
-    summary="Get a doctor by ID",
-)
+@router.get("/{doctor_id}", response_model=DoctorResponse)
 def get_doctor(
-    doctor_id: UUID,
-    current_user: User = Depends(get_current_user),
-    service: DoctorService = Depends(get_service),
+    doctor_id: UUID, service: DoctorService = Depends(get_service)
 ):
     try:
-        return service.get_by_id(_hospital_id(current_user), doctor_id)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        return service.get_public_by_id(doctor_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.put(
     "/{doctor_id}",
     response_model=DoctorResponse,
-    summary="Update a doctor (admin only)",
+    dependencies=[Depends(require_active_status)],
 )
 def update_doctor(
     doctor_id: UUID,
     payload: DoctorUpdate,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
     service: DoctorService = Depends(get_service),
 ):
     try:
-        return service.update(_hospital_id(current_user), doctor_id, payload)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        return service.update(doctor_id, payload, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
-@router.delete(
-    "/{doctor_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Soft-delete a doctor (admin only)",
-)
+@router.delete("/{doctor_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_doctor(
     doctor_id: UUID,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(require_role(UserRole.WEBSITE_ADMIN)),
     service: DoctorService = Depends(get_service),
 ):
     try:
-        service.delete(_hospital_id(current_user), doctor_id)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        service.delete(doctor_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-# ---------------------------------------------------------------------------
-# Slots
-# ---------------------------------------------------------------------------
-
-@router.get(
-    "/{doctor_id}/slots",
-    response_model=list[SlotResponse],
-    summary="Get available slots for a doctor on a given date",
-)
+@router.get("/{doctor_id}/slots", response_model=list[SlotResponse])
 def get_slots(
     doctor_id: UUID,
     date: date = Query(..., description="Target date (YYYY-MM-DD)"),
-    current_user: User = Depends(get_current_user),
     service: DoctorService = Depends(get_service),
 ):
     try:
-        return service.get_slots(_hospital_id(current_user), doctor_id, date)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        return service.get_slots(doctor_id, date)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-
-# ---------------------------------------------------------------------------
-# Schedule
-# ---------------------------------------------------------------------------
 
 @router.post(
     "/{doctor_id}/schedule",
     response_model=ScheduleResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Set (upsert) a schedule entry for a weekday (admin only)",
+    dependencies=[Depends(require_active_status)],
 )
 def set_schedule(
     doctor_id: UUID,
     payload: ScheduleCreate,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
     service: DoctorService = Depends(get_service),
 ):
     try:
-        return service.set_schedule(_hospital_id(current_user), doctor_id, payload)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+        return service.set_schedule(doctor_id, payload, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.delete(
-    "/{doctor_id}/schedule/{day}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Remove a schedule entry for a weekday (admin only)",
+    "/{doctor_id}/schedule/{day}", status_code=status.HTTP_204_NO_CONTENT
 )
 def delete_schedule(
     doctor_id: UUID,
     day: DayOfWeek,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
     service: DoctorService = Depends(get_service),
 ):
     try:
-        service.delete_schedule(_hospital_id(current_user), doctor_id, day)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        service.delete_schedule(doctor_id, day, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
-
-# ---------------------------------------------------------------------------
-# Leave
-# ---------------------------------------------------------------------------
 
 @router.post(
     "/{doctor_id}/leave",
     response_model=LeaveResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Mark a leave date for a doctor (admin only)",
+    dependencies=[Depends(require_active_status)],
 )
 def add_leave(
     doctor_id: UUID,
     payload: LeaveCreate,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
     service: DoctorService = Depends(get_service),
 ):
     try:
-        return service.add_leave(_hospital_id(current_user), doctor_id, payload)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+        return service.add_leave(doctor_id, payload, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.delete(
-    "/{doctor_id}/leave/{leave_date}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Cancel a leave date for a doctor (admin only)",
+    "/{doctor_id}/leave/{leave_date}", status_code=status.HTTP_204_NO_CONTENT
 )
 def cancel_leave(
     doctor_id: UUID,
     leave_date: date,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
     service: DoctorService = Depends(get_service),
 ):
     try:
-        service.cancel_leave(_hospital_id(current_user), doctor_id, leave_date)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        service.cancel_leave(doctor_id, leave_date, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc

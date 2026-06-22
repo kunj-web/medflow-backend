@@ -70,32 +70,45 @@ def hospital(db):
 @pytest.fixture
 def admin_headers(db, hospital):
     from app.core.security import create_token_pair
-    from app.models.enums import UserRole
+    from app.models.enums import AccountStatus, UserRole
     from tests.factories.user_factory import UserFactory
-    user = UserFactory.create(db, hospital.id, role=UserRole.ADMIN)
-    tokens = create_token_pair(str(user.id), "admin", str(hospital.id))
+    user = UserFactory.create(
+        db,
+        role=UserRole.WEBSITE_ADMIN,
+        is_super_admin=True,
+    )
+    tokens = create_token_pair(
+        str(user.id),
+        UserRole.WEBSITE_ADMIN.value,
+        AccountStatus.ACTIVE.value,
+        True,
+    )
     return {"Authorization": f"Bearer {tokens['access_token']}"}
 
 
 @pytest.fixture
 def doctor_headers(db, hospital):
     from app.core.security import create_token_pair
-    from app.models.enums import UserRole
+    from app.models.enums import AccountStatus, UserRole
     from tests.factories.doctor_factory import DoctorFactory
     from tests.factories.user_factory import UserFactory
     user = UserFactory.create(db, hospital.id, role=UserRole.DOCTOR)
     DoctorFactory.create(db, hospital.id, user_id=user.id)
-    tokens = create_token_pair(str(user.id), "doctor", str(hospital.id))
+    tokens = create_token_pair(
+        str(user.id), UserRole.DOCTOR.value, AccountStatus.ACTIVE.value
+    )
     return {"Authorization": f"Bearer {tokens['access_token']}"}
 
 
 @pytest.fixture
 def patient_headers(db, hospital):
     from app.core.security import create_token_pair
-    from app.models.enums import UserRole
+    from app.models.enums import AccountStatus, UserRole
     from tests.factories.patient_factory import PatientFactory
     from tests.factories.user_factory import UserFactory
     user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
     PatientFactory.create(db, hospital.id, user_id=user.id)
-    tokens = create_token_pair(str(user.id), "patient", str(hospital.id))
+    tokens = create_token_pair(
+        str(user.id), UserRole.PATIENT.value, AccountStatus.ACTIVE.value
+    )
     return {"Authorization": f"Bearer {tokens['access_token']}"}

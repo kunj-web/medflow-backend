@@ -89,7 +89,9 @@ class AppointmentReschedule(BaseModel):
 
 class AppointmentResponse(BaseModel):
     id: UUID
-    hospital_id: UUID
+    # Historical snapshot copied from the doctor at booking time. Clinic
+    # doctors intentionally produce appointments without a hospital.
+    hospital_id: UUID | None
     slot_time: datetime
     end_time: datetime | None
     status: AppointmentStatus

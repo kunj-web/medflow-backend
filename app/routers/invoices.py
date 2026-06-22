@@ -5,158 +5,134 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db, require_role
+from app.core.dependencies import get_db, require_active_status, require_role
 from app.models.enums import InvoiceStatus, UserRole
-from app.models.user import User
-from app.schemas.invoice import (
-    InvoiceCreate,
-    InvoiceResponse,
-    PaymentRequest,
-)
+from app.schemas.invoice import InvoiceCreate, InvoiceResponse, PaymentRequest
 from app.schemas.pagination import PaginatedResponse, PaginationParams
 from app.services.billing_service import BillingService
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def get_service(db: Session = Depends(get_db)) -> BillingService:
     return BillingService(db)
 
 
-def _hospital_id(current_user: dict) -> UUID:
-    return UUID(current_user["hospital_id"])
-
-
-# ---------------------------------------------------------------------------
-# List & get
-# ---------------------------------------------------------------------------
-
-@router.get(
-    "",
-    response_model=PaginatedResponse[InvoiceResponse],
-    summary="List invoices (admin / staff)",
-)
+@router.get("", response_model=PaginatedResponse[InvoiceResponse])
 def list_invoices(
-    patient_id: UUID | None = Query(None),
     invoice_status: InvoiceStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.STAFF)),
+    current_user: dict = Depends(
+        require_role(
+            UserRole.PATIENT, UserRole.DOCTOR, UserRole.WEBSITE_ADMIN
+        )
+    ),
     service: BillingService = Depends(get_service),
 ):
-    params = PaginationParams(page=page, page_size=page_size)
-    return service.list_invoices(
-        _hospital_id(current_user), params, patient_id, invoice_status
-    )
+    try:
+        return service.list_for_actor(
+            UUID(current_user["user_id"]),
+            current_user["role"],
+            PaginationParams(page=page, page_size=page_size),
+            invoice_status,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
-@router.get(
-    "/{invoice_id}",
-    response_model=InvoiceResponse,
-    summary="Get an invoice by ID",
-)
+@router.get("/{invoice_id}", response_model=InvoiceResponse)
 def get_invoice(
     invoice_id: UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(
+        require_role(
+            UserRole.PATIENT, UserRole.DOCTOR, UserRole.WEBSITE_ADMIN
+        )
+    ),
     service: BillingService = Depends(get_service),
 ):
-    """
-    Patients can only see their own invoices.
-    Admin / staff / doctor can see any invoice in the hospital.
-    """
     try:
-        invoice = service.get_by_id(_hospital_id(current_user), invoice_id)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+        return service.get_by_id_for_actor(
+            invoice_id,
+            UUID(current_user["user_id"]),
+            current_user["role"],
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        # Hide the existence of invoices owned by another user.
+        raise HTTPException(status_code=404, detail="Invoice not found") from exc
 
-    if current_user.role == UserRole.PATIENT:
-        patient = getattr(current_user, "patient", None)
-        if not patient or invoice.patient_id != patient.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-
-    return invoice
-
-
-# ---------------------------------------------------------------------------
-# Create
-# ---------------------------------------------------------------------------
 
 @router.post(
     "",
     response_model=InvoiceResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a draft invoice for an appointment (admin / staff)",
+    dependencies=[Depends(require_active_status)],
 )
 def create_invoice(
     payload: InvoiceCreate,
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.STAFF)),
+    current_user: dict = Depends(require_role(UserRole.WEBSITE_ADMIN)),
     service: BillingService = Depends(get_service),
 ):
     try:
-        return service.create_invoice(_hospital_id(current_user), payload)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+        return service.create_invoice(payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-
-# ---------------------------------------------------------------------------
-# State transitions
-# ---------------------------------------------------------------------------
 
 @router.post(
     "/{invoice_id}/issue",
     response_model=InvoiceResponse,
-    summary="Issue a draft invoice (admin / staff)",
+    dependencies=[Depends(require_active_status)],
 )
 def issue_invoice(
     invoice_id: UUID,
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.STAFF)),
+    current_user: dict = Depends(require_role(UserRole.WEBSITE_ADMIN)),
     service: BillingService = Depends(get_service),
 ):
     try:
-        return service.issue_invoice(_hospital_id(current_user), invoice_id)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+        return service.issue_invoice(invoice_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post(
     "/{invoice_id}/pay",
     response_model=InvoiceResponse,
-    summary="Record a payment against an invoice (admin / staff)",
+    dependencies=[Depends(require_active_status)],
 )
 def pay_invoice(
     invoice_id: UUID,
     payload: PaymentRequest,
-    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.STAFF)),
+    current_user: dict = Depends(require_role(UserRole.WEBSITE_ADMIN)),
     service: BillingService = Depends(get_service),
 ):
     try:
-        return service.record_payment(_hospital_id(current_user), invoice_id, payload)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+        return service.record_payment(invoice_id, payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post(
     "/{invoice_id}/cancel",
     response_model=InvoiceResponse,
-    summary="Cancel an invoice (admin only)",
+    dependencies=[Depends(require_active_status)],
 )
 def cancel_invoice(
     invoice_id: UUID,
-    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    current_user: dict = Depends(require_role(UserRole.WEBSITE_ADMIN)),
     service: BillingService = Depends(get_service),
 ):
     try:
-        return service.cancel_invoice(_hospital_id(current_user), invoice_id)
-    except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+        return service.cancel_invoice(invoice_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc

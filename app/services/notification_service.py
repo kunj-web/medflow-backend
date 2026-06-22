@@ -189,7 +189,9 @@ class NotificationService:
                 "appointment_id": str(appointment.id),
             },
             db=db,
-            hospital_id=str(appointment.hospital_id),
+            hospital_id=(
+                str(appointment.hospital_id) if appointment.hospital_id else None
+            ),
         )
 
         # --- Patient email ---
@@ -215,7 +217,9 @@ class NotificationService:
                 "appointment_id": str(appointment.id),
             },
             db=db,
-            hospital_id=str(appointment.hospital_id),
+            hospital_id=(
+                str(appointment.hospital_id) if appointment.hospital_id else None
+            ),
         )
 
     def notify_appointment_cancelled(self, appointment: Appointment, db: Session) -> None:
@@ -237,7 +241,9 @@ class NotificationService:
                 "appointment_id": str(appointment.id),
             },
             db=db,
-            hospital_id=str(appointment.hospital_id),
+            hospital_id=(
+                str(appointment.hospital_id) if appointment.hospital_id else None
+            ),
         )
 
         # --- Patient email ---
@@ -262,7 +268,9 @@ class NotificationService:
                 "appointment_id": str(appointment.id),
             },
             db=db,
-            hospital_id=str(appointment.hospital_id),
+            hospital_id=(
+                str(appointment.hospital_id) if appointment.hospital_id else None
+            ),
         )
 
     def notify_appointment_reminder(self, appointment: Appointment, db: Session, hours_before: int) -> None:
@@ -299,7 +307,9 @@ class NotificationService:
                 "hours_before": str(hours_before),
             },
             db=db,
-            hospital_id=str(appointment.hospital_id),
+            hospital_id=(
+                str(appointment.hospital_id) if appointment.hospital_id else None
+            ),
         )
 
         # --- Patient email ---
