@@ -18,12 +18,12 @@ class PatientFactory:
 
         patient = Patient(
             user_id=user_id,
-            hospital_id=hospital_id,
             first_name=kwargs.get("first_name", fake.first_name()),
             last_name=kwargs.get("last_name", fake.last_name()),
             phone=kwargs.get("phone", fake.numerify("##########")),
             email=kwargs.get("email", fake.unique.email()),
             gender=kwargs.get("gender", Gender.MALE),
+            date_of_birth=kwargs.get("date_of_birth", fake.date_of_birth()),
             blood_group=kwargs.get("blood_group", BloodGroup.O_POS),
             existing_conditions=kwargs.get("existing_conditions", None),
         )

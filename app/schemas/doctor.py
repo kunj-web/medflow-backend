@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
-from app.models.enums import DayOfWeek, Gender
+from app.models.enums import DayOfWeek, Gender, WorkType
 from app.schemas.validators.common import (
     validate_non_empty_string,
     validate_positive_amount,
@@ -172,6 +172,14 @@ class DoctorResponse(BaseModel):
     experience_years: int
     consultation_fee: float
     is_active: bool
+    work_type: WorkType
+    hospital_id: UUID | None
+    clinic_name: str | None
+    clinic_city: str | None
+    clinic_address: str | None
+    pending_hospital_name: str | None
+    pending_hospital_city: str | None
+    pending_hospital_state: str | None
     schedules: list[ScheduleResponse] = []
 
     model_config = {"from_attributes": True}

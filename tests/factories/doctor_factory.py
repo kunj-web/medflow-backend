@@ -4,7 +4,7 @@ from uuid import UUID
 from faker import Faker
 
 from app.models.doctor import Doctor, DoctorSchedule
-from app.models.enums import DayOfWeek, Gender, UserRole
+from app.models.enums import DayOfWeek, Gender, UserRole, WorkType
 from tests.factories.user_factory import UserFactory
 
 fake = Faker("en_IN")
@@ -35,6 +35,7 @@ class DoctorFactory:
             consultation_fee=kwargs.get("consultation_fee", 500),
             experience_years=kwargs.get("experience_years", 5),
             is_active=kwargs.get("is_active", True),
+            work_type=kwargs.get("work_type", WorkType.HOSPITAL),
         )
         db.add(doctor)
         db.flush()
@@ -46,7 +47,6 @@ class DoctorFactory:
         ]:
             db.add(DoctorSchedule(
                 doctor_id=doctor.id,
-                hospital_id=hospital_id,
                 day_of_week=day,
                 start_time=time(9, 0),
                 end_time=time(17, 0),

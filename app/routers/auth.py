@@ -7,6 +7,7 @@ from app.schemas.auth import (
     MeResponse,
     RefreshRequest,
     RegisterRequest,
+    RegisterResponse,
     TokenResponse,
 )
 from app.services.auth_service import AuthService
@@ -14,7 +15,11 @@ from app.services.auth_service import AuthService
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=RegisterResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
     try:
         return AuthService(db).register(data)
