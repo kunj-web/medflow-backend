@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.routers.admin_review import router as admin_review_router
 from app.routers.appointments import router as appointments_router
 
 # Routers — existing
@@ -43,6 +44,7 @@ app.add_middleware(
 PREFIX = "/api/v1"
 
 app.include_router(auth_router,          prefix=PREFIX)
+app.include_router(admin_review_router,  prefix=PREFIX)
 app.include_router(appointments_router,  prefix=PREFIX)
 app.include_router(config_router,        prefix=PREFIX)
 app.include_router(notifications_router, prefix=PREFIX)
