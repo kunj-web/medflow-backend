@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from uuid import UUID
 
-from app.models.enums import AccountStatus, Gender, UserRole, WorkType
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
+
+from app.models.enums import Gender, UserRole, WorkType
 from app.schemas.validators import (
     validate_indian_phone,
     validate_non_empty_string,
@@ -245,4 +246,3 @@ class MeResponse(BaseModel):
     role: str
     status: str
     is_super_admin: bool = False
-    

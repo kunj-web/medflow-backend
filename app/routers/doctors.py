@@ -82,7 +82,11 @@ def update_doctor(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
-@router.delete("/{doctor_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{doctor_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_active_status)],
+)
 def delete_doctor(
     doctor_id: UUID,
     current_user: dict = Depends(require_role(UserRole.WEBSITE_ADMIN)),
@@ -129,7 +133,9 @@ def set_schedule(
 
 
 @router.delete(
-    "/{doctor_id}/schedule/{day}", status_code=status.HTTP_204_NO_CONTENT
+    "/{doctor_id}/schedule/{day}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_active_status)],
 )
 def delete_schedule(
     doctor_id: UUID,
@@ -172,7 +178,9 @@ def add_leave(
 
 
 @router.delete(
-    "/{doctor_id}/leave/{leave_date}", status_code=status.HTTP_204_NO_CONTENT
+    "/{doctor_id}/leave/{leave_date}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_active_status)],
 )
 def cancel_leave(
     doctor_id: UUID,
