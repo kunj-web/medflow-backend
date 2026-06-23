@@ -77,7 +77,11 @@ def book_appointment(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/", response_model=PaginatedResponse[AppointmentResponse])
+@router.get(
+    "/",
+    response_model=PaginatedResponse[AppointmentResponse],
+    dependencies=[Depends(require_active_status)],
+)
 def list_appointments(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -105,7 +109,10 @@ def list_appointments(
     )
 
 
-@router.get("/queue/today")
+@router.get(
+    "/queue/today",
+    dependencies=[Depends(require_active_status)],
+)
 def today_queue(
     db: Session = Depends(get_db),
     current_user: dict = Depends(
@@ -130,7 +137,11 @@ def today_queue(
     return {"data": appointments, "total": len(appointments)}
 
 
-@router.get("/{appointment_id}", response_model=AppointmentResponse)
+@router.get(
+    "/{appointment_id}",
+    response_model=AppointmentResponse,
+    dependencies=[Depends(require_active_status)],
+)
 def get_appointment(
     appointment_id: UUID,
     db: Session = Depends(get_db),

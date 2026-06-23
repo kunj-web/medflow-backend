@@ -18,7 +18,11 @@ def get_service(db: Session = Depends(get_db)) -> BillingService:
     return BillingService(db)
 
 
-@router.get("", response_model=PaginatedResponse[InvoiceResponse])
+@router.get(
+    "",
+    response_model=PaginatedResponse[InvoiceResponse],
+    dependencies=[Depends(require_active_status)],
+)
 def list_invoices(
     invoice_status: InvoiceStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
@@ -41,7 +45,11 @@ def list_invoices(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
-@router.get("/{invoice_id}", response_model=InvoiceResponse)
+@router.get(
+    "/{invoice_id}",
+    response_model=InvoiceResponse,
+    dependencies=[Depends(require_active_status)],
+)
 def get_invoice(
     invoice_id: UUID,
     current_user: dict = Depends(

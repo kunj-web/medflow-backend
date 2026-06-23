@@ -41,7 +41,11 @@ def _authorize_patient_access(
         raise HTTPException(status_code=404, detail="Patient not found")
 
 
-@router.get("", response_model=PaginatedResponse[PatientResponse])
+@router.get(
+    "",
+    response_model=PaginatedResponse[PatientResponse],
+    dependencies=[Depends(require_active_status)],
+)
 def list_patients(
     search: str | None = Query(None),
     page: int = Query(1, ge=1),
@@ -55,7 +59,9 @@ def list_patients(
 
 
 @router.get(
-    "/{patient_id}", response_model=PatientWithAppointmentsResponse
+    "/{patient_id}",
+    response_model=PatientWithAppointmentsResponse,
+    dependencies=[Depends(require_active_status)],
 )
 def get_patient(
     patient_id: UUID,
@@ -93,7 +99,11 @@ def update_patient(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{patient_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_active_status)],
+)
 def delete_patient(
     patient_id: UUID,
     current_user: dict = Depends(require_role(UserRole.WEBSITE_ADMIN)),
@@ -108,6 +118,7 @@ def delete_patient(
 @router.get(
     "/{patient_id}/appointments",
     response_model=PaginatedResponse[AppointmentResponse],
+    dependencies=[Depends(require_active_status)],
 )
 def get_appointment_history(
     patient_id: UUID,
