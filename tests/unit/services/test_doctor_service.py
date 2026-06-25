@@ -1,284 +1,170 @@
-"""
-tests/unit/services/test_doctor_service.py
-
-Covers:
-- Doctor + User created in one transaction
-- Slot generation from schedule
-- Schedule upsert (create and overwrite)
-- Leave conflict detection
-- Hospital scoping (doctor from other hospital not visible)
-- Inactive doctor cannot be booked
-"""
-from datetime import date, time
+from datetime import date, time, timedelta
+from uuid import uuid4
 
 import pytest
 
-from app.models.enums import DayOfWeek, UserRole
-from app.schemas.doctor import DoctorCreate, ScheduleUpsert
+from app.models.doctor import DoctorLeave
+from app.models.enums import AccountStatus, DayOfWeek, UserRole
+from app.repositories.doctor_repo import DoctorRepository
+from app.schemas.doctor import LeaveCreate, ScheduleCreate
+from app.schemas.pagination import PaginationParams
 from app.services.doctor_service import DoctorService
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.user_factory import UserFactory
 
 
-class TestDoctorServiceCreate:
+def next_weekday(day: DayOfWeek) -> date:
+    target = list(DayOfWeek).index(day)
+    today = date.today()
+    days_ahead = (target - today.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7
+    return today + timedelta(days=days_ahead)
 
-    def test_creates_user_and_doctor_together(self, db, hospital):
-        service = DoctorService(db)
-        data = DoctorCreate(
-            email="newdoc@test.com",
-            phone="9876543210",
-            password="Test@1234",
-            first_name="Arjun",
-            last_name="Mehta",
-            gender="male",
-            registration_number="REG00001",
-            specialization="Cardiologist",
-            consultation_fee=800,
-            experience_years=10,
+
+class TestDoctorPublicAccess:
+    def test_list_public_returns_only_active_approved_doctors(self, db, hospital):
+        active = DoctorFactory.create(db, hospital.id, specialization="Cardiologist")
+        inactive = DoctorFactory.create(db, hospital.id, is_active=False)
+        pending_user = UserFactory.create(
+            db,
+            hospital.id,
+            role=UserRole.DOCTOR,
+            status=AccountStatus.PENDING,
         )
-        doctor = service.create(data, hospital_id=hospital.id)
+        pending = DoctorFactory.create(db, hospital.id, user_id=pending_user.id)
 
-        assert doctor.id is not None
-        assert doctor.user_id is not None
-        assert doctor.first_name == "Arjun"
-        assert doctor.last_name == "Mehta"
-        assert doctor.hospital_id == hospital.id
-        assert doctor.is_active is True
+        result = DoctorService(db).list_public(PaginationParams(page=1, page_size=20))
 
-    def test_duplicate_registration_number_raises(self, db, hospital):
-        DoctorFactory.create(db, hospital.id, registration_number="REG99999")
-        service = DoctorService(db)
-        data = DoctorCreate(
-            email="another@test.com",
-            phone="9123456780",
-            password="Test@1234",
-            first_name="Priya",
-            last_name="Nair",
-            gender="female",
-            registration_number="REG99999",  # duplicate
-            specialization="Dermatologist",
-            consultation_fee=600,
-            experience_years=3,
+        ids = {doctor.id for doctor in result.data}
+        assert active.id in ids
+        assert inactive.id not in ids
+        assert pending.id not in ids
+
+    def test_get_public_by_id_rejects_pending_doctor(self, db, hospital):
+        pending_user = UserFactory.create(
+            db,
+            hospital.id,
+            role=UserRole.DOCTOR,
+            status=AccountStatus.PENDING,
         )
-        with pytest.raises(ValueError, match="registration number"):
-            service.create(data, hospital_id=hospital.id)
+        doctor = DoctorFactory.create(db, hospital.id, user_id=pending_user.id)
 
-    def test_duplicate_email_raises(self, db, hospital):
-        DoctorFactory.create(db, hospital.id, email="taken@test.com")
-        service = DoctorService(db)
-        data = DoctorCreate(
-            email="taken@test.com",
-            phone="9000000001",
-            password="Test@1234",
-            first_name="Test",
-            last_name="Doc",
-            gender="male",
-            registration_number="REG00002",
-            specialization="General Physician",
-            consultation_fee=300,
-            experience_years=1,
-        )
-        with pytest.raises(ValueError, match="email"):
-            service.create(data, hospital_id=hospital.id)
+        with pytest.raises(LookupError, match="Doctor not found"):
+            DoctorService(db).get_public_by_id(doctor.id)
 
 
-class TestDoctorScheduleUpsert:
-
-    def test_upsert_creates_new_schedule(self, db, hospital):
+class TestDoctorSchedule:
+    def test_admin_can_set_schedule(self, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
         service = DoctorService(db)
 
-        service.upsert_schedule(
-            doctor_id=doctor.id,
-            hospital_id=hospital.id,
-            data=ScheduleUpsert(
+        result = service.set_schedule(
+            doctor.id,
+            ScheduleCreate(
                 day_of_week=DayOfWeek.SUNDAY,
                 start_time=time(10, 0),
                 end_time=time(14, 0),
             ),
+            actor_user_id=uuid_for_admin(),
+            is_website_admin=True,
         )
 
-        from app.repositories.doctor_repo import DoctorRepository
-        repo = DoctorRepository(db)
-        schedule = repo.get_schedule_for_day(doctor.id, DayOfWeek.SUNDAY)
-        assert schedule is not None
-        assert schedule.start_time == time(10, 0)
-        assert schedule.end_time == time(14, 0)
+        assert result.day_of_week == DayOfWeek.SUNDAY
+        assert result.start_time == time(10, 0)
+        assert result.end_time == time(14, 0)
 
-    def test_upsert_overwrites_existing_schedule(self, db, hospital):
-        doctor = DoctorFactory.create(db, hospital.id)  # has Mon-Sat 9-17
+    def test_owner_doctor_can_overwrite_schedule(self, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
         service = DoctorService(db)
 
-        service.upsert_schedule(
-            doctor_id=doctor.id,
-            hospital_id=hospital.id,
-            data=ScheduleUpsert(
+        service.set_schedule(
+            doctor.id,
+            ScheduleCreate(
                 day_of_week=DayOfWeek.MONDAY,
                 start_time=time(8, 0),
                 end_time=time(12, 0),
             ),
+            actor_user_id=doctor.user_id,
+            is_website_admin=False,
         )
 
-        from app.repositories.doctor_repo import DoctorRepository
-        repo = DoctorRepository(db)
-        schedule = repo.get_schedule_for_day(doctor.id, DayOfWeek.MONDAY)
+        schedule = DoctorRepository(db).get_schedule_for_day(
+            doctor.id, DayOfWeek.MONDAY
+        )
         assert schedule.start_time == time(8, 0)
         assert schedule.end_time == time(12, 0)
 
-    def test_upsert_from_other_hospital_raises(self, db, hospital):
-        from app.models.hospital import Hospital
-        other = Hospital(name="Other", primary_color="#000000", currency="INR", timezone="Asia/Kolkata")
-        db.add(other)
-        db.flush()
+    def test_other_doctor_cannot_set_schedule(self, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        other = DoctorFactory.create(db, hospital.id)
 
+        with pytest.raises(PermissionError, match="Access denied"):
+            DoctorService(db).set_schedule(
+                doctor.id,
+                ScheduleCreate(
+                    day_of_week=DayOfWeek.SUNDAY,
+                    start_time=time(10, 0),
+                    end_time=time(14, 0),
+                ),
+                actor_user_id=other.user_id,
+                is_website_admin=False,
+            )
+
+    def test_delete_schedule_removes_schedule(self, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
         service = DoctorService(db)
 
-        with pytest.raises(ValueError, match="not found"):
-            service.upsert_schedule(
-                doctor_id=doctor.id,
-                hospital_id=other.id,  # wrong hospital
-                data=ScheduleUpsert(
-                    day_of_week=DayOfWeek.MONDAY,
-                    start_time=time(9, 0),
-                    end_time=time(17, 0),
-                ),
-            )
+        service.delete_schedule(
+            doctor.id,
+            DayOfWeek.MONDAY,
+            actor_user_id=doctor.user_id,
+            is_website_admin=False,
+        )
+
+        assert DoctorRepository(db).get_schedule_for_day(
+            doctor.id, DayOfWeek.MONDAY
+        ) is None
 
 
-class TestDoctorLeave:
-
-    def test_approved_leave_blocks_booking(self, db, hospital):
-        """
-        Verifies that AppointmentService raises when doctor has approved leave.
-        Indirectly tests DoctorRepository.get_leave_for_date.
-        """
-        from datetime import datetime
-
-        from app.models.doctor import DoctorLeave
-        from app.models.enums import AppointmentType
-        from app.schemas.appointment import AppointmentCreate
-        from app.services.appointment_service import AppointmentService
-        from tests.factories.patient_factory import PatientFactory
-
+class TestDoctorLeaveAndSlots:
+    def test_add_leave_rejects_past_date(self, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
-        patient = PatientFactory.create(db, hospital.id)
-        user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
 
-        leave_date = date(2025, 6, 2)  # Monday
-        leave = DoctorLeave(
-            doctor_id=doctor.id,
-            hospital_id=hospital.id,
-            leave_date=leave_date,
-            is_approved=True,
-            reason="Conference",
-        )
-        db.add(leave)
-        db.flush()
-
-        service = AppointmentService(db)
-        with pytest.raises(ValueError, match="leave"):
-            service.book(
-                data=AppointmentCreate(
-                    doctor_id=doctor.id,
-                    slot_time=datetime(2025, 6, 2, 10, 0, 0),
-                    type=AppointmentType.CONSULTATION,
-                ),
-                hospital_id=hospital.id,
-                patient_id=patient.id,
-                user_id=user.id,
+        with pytest.raises(ValueError, match="past date"):
+            DoctorService(db).add_leave(
+                doctor.id,
+                LeaveCreate(leave_date=date.today() - timedelta(days=1)),
+                actor_user_id=doctor.user_id,
+                is_website_admin=False,
             )
 
-    def test_unapproved_leave_does_not_block(self, db, hospital):
-        from datetime import datetime
-
-        from app.models.doctor import DoctorLeave
-        from app.models.enums import AppointmentType
-        from app.schemas.appointment import AppointmentCreate
-        from app.services.appointment_service import AppointmentService
-        from tests.factories.patient_factory import PatientFactory
-
+    def test_leave_blocks_slots_for_that_date(self, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
-        patient = PatientFactory.create(db, hospital.id)
-        user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
-
-        leave = DoctorLeave(
-            doctor_id=doctor.id,
-            hospital_id=hospital.id,
-            leave_date=date(2025, 6, 2),
-            is_approved=False,  # pending — should NOT block
-            reason="Pending",
-        )
-        db.add(leave)
-        db.flush()
-
-        service = AppointmentService(db)
-        result = service.book(
-            data=AppointmentCreate(
+        target = next_weekday(DayOfWeek.MONDAY)
+        db.add(
+            DoctorLeave(
                 doctor_id=doctor.id,
-                slot_time=datetime(2025, 6, 2, 10, 0, 0),
-                type=AppointmentType.CONSULTATION,
-            ),
-            hospital_id=hospital.id,
-            patient_id=patient.id,
-            user_id=user.id,
+                leave_date=target,
+                reason="Conference",
+            )
         )
-        assert result.id is not None
-
-
-class TestDoctorHospitalScoping:
-
-    def test_doctor_from_other_hospital_not_bookable(self, db, hospital):
-        from datetime import datetime
-
-        from app.models.enums import AppointmentType
-        from app.models.hospital import Hospital
-        from app.schemas.appointment import AppointmentCreate
-        from app.services.appointment_service import AppointmentService
-        from tests.factories.patient_factory import PatientFactory
-
-        other = Hospital(name="Other", primary_color="#000000", currency="INR", timezone="Asia/Kolkata")
-        db.add(other)
         db.flush()
 
-        doctor = DoctorFactory.create(db, other.id)  # doctor belongs to 'other'
-        patient = PatientFactory.create(db, hospital.id)
-        user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
+        slots = DoctorService(db).get_slots(doctor.id, target)
 
-        service = AppointmentService(db)
-        with pytest.raises(ValueError, match="not found"):
-            service.book(
-                data=AppointmentCreate(
-                    doctor_id=doctor.id,
-                    slot_time=datetime(2025, 6, 2, 10, 0, 0),
-                    type=AppointmentType.CONSULTATION,
-                ),
-                hospital_id=hospital.id,  # different hospital
-                patient_id=patient.id,
-                user_id=user.id,
-            )
+        assert slots == []
 
-    def test_inactive_doctor_cannot_be_booked(self, db, hospital):
-        from datetime import datetime
+    def test_get_slots_uses_schedule_duration(self, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
 
-        from app.models.enums import AppointmentType
-        from app.schemas.appointment import AppointmentCreate
-        from app.services.appointment_service import AppointmentService
-        from tests.factories.patient_factory import PatientFactory
+        slots = DoctorService(db).get_slots(doctor.id, target)
 
-        doctor = DoctorFactory.create(db, hospital.id, is_active=False)
-        patient = PatientFactory.create(db, hospital.id)
-        user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
+        assert len(slots) == 32
+        assert slots[0].datetime.endswith("T09:00:00")
+        assert slots[0].is_available is True
 
-        service = AppointmentService(db)
-        with pytest.raises(ValueError, match="not available"):
-            service.book(
-                data=AppointmentCreate(
-                    doctor_id=doctor.id,
-                    slot_time=datetime(2025, 6, 2, 10, 0, 0),
-                    type=AppointmentType.CONSULTATION,
-                ),
-                hospital_id=hospital.id,
-                patient_id=patient.id,
-                user_id=user.id,
-            )
+
+def uuid_for_admin():
+    return uuid4()

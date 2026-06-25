@@ -87,7 +87,7 @@ class DoctorCreate(BaseModel):
 
     # Professional
     specialization: str
-    qualification: str
+    qualification: str | None = None
     registration_number: str
     experience_years: int = 0
 
@@ -97,10 +97,17 @@ class DoctorCreate(BaseModel):
     # Auth — the linked User is created alongside the Doctor
     password: str
 
-    @field_validator("first_name", "last_name", "specialization", "qualification", "registration_number")
+    @field_validator("first_name", "last_name", "specialization", "registration_number")
     @classmethod
     def non_empty(cls, v: str) -> str:
         return validate_non_empty_string(v)
+
+    @field_validator("qualification")
+    @classmethod
+    def optional_non_empty(cls, v: str | None) -> str | None:
+        if v is not None:
+            return validate_non_empty_string(v)
+        return v
 
     @field_validator("phone")
     @classmethod
@@ -170,7 +177,7 @@ class DoctorResponse(BaseModel):
     phone: str
     email: str | None
     specialization: str
-    qualification: str
+    qualification: str | None
     registration_number: str
     experience_years: int
     consultation_fee: float
