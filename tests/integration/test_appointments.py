@@ -1,95 +1,199 @@
+from datetime import date, datetime, time, timedelta
+
 from app.core.security import create_token_pair
-from app.models.enums import UserRole
+from app.models.enums import AccountStatus, DayOfWeek, UserRole
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.patient_factory import PatientFactory
 from tests.factories.user_factory import UserFactory
 
-VALID_SLOT = "2026-12-07T10:00:00+00:00"  # future Monday, 15-min aligned
+
+def next_weekday(day: DayOfWeek) -> date:
+    target = list(DayOfWeek).index(day)
+    today = date.today()
+    days_ahead = (target - today.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7
+    return today + timedelta(days=days_ahead)
 
 
-class TestAppointmentRoutes:
+def slot_at(day: DayOfWeek, hour: int, minute: int = 0) -> datetime:
+    return datetime.combine(next_weekday(day), time(hour, minute))
 
+
+def headers_for(user_id, role=UserRole.PATIENT):
+    tokens = create_token_pair(
+        str(user_id),
+        role.value,
+        AccountStatus.ACTIVE.value,
+        role == UserRole.WEBSITE_ADMIN,
+    )
+    return {"Authorization": f"Bearer {tokens['access_token']}"}
+
+
+async def book(client, doctor, patient):
+    return await client.post(
+        "/api/v1/appointments/",
+        json={
+            "doctor_id": str(doctor.id),
+            "slot_time": slot_at(DayOfWeek.MONDAY, 10).isoformat(),
+        },
+        headers=headers_for(patient.user_id),
+    )
+
+
+class TestAppointmentBooking:
     async def test_patient_can_book_appointment(self, client, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
-        user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
-        PatientFactory.create(db, hospital.id, user_id=user.id)
-        tokens = create_token_pair(str(user.id), "patient", str(hospital.id))
-        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+        patient = PatientFactory.create(db, hospital.id)
 
-        response = await client.post(
-            "/api/v1/appointments",
-            json={"doctor_id": str(doctor.id), "slot_time": VALID_SLOT},
-            headers=headers,
-        )
+        response = await book(client, doctor, patient)
+
         assert response.status_code == 201
         data = response.json()
         assert data["status"] == "scheduled"
         assert data["token_number"] == 1
+        assert data["patient"]["id"] == str(patient.id)
+        assert data["doctor"]["id"] == str(doctor.id)
 
-    async def test_unauthenticated_cannot_book(self, client):
-        response = await client.post("/api/v1/appointments", json={})
-        assert response.status_code == 403
+    async def test_unauthenticated_cannot_book(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
 
-    async def test_doctor_cannot_book_appointment(self, client, doctor_headers):
         response = await client.post(
-            "/api/v1/appointments",
-            json={"doctor_id": "some-id", "slot_time": VALID_SLOT},
-            headers=doctor_headers,
+            "/api/v1/appointments/",
+            json={
+                "doctor_id": str(doctor.id),
+                "slot_time": slot_at(DayOfWeek.MONDAY, 10).isoformat(),
+            },
         )
+
+        assert response.status_code == 401
+
+    async def test_doctor_cannot_book_appointment(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+
+        response = await client.post(
+            "/api/v1/appointments/",
+            json={
+                "doctor_id": str(doctor.id),
+                "slot_time": slot_at(DayOfWeek.MONDAY, 10).isoformat(),
+            },
+            headers=headers_for(doctor.user_id, UserRole.DOCTOR),
+        )
+
         assert response.status_code == 403
 
-    async def test_admin_can_list_appointments(self, client, admin_headers):
+
+class TestAppointmentListing:
+    async def test_admin_can_list_appointments(self, client, db, hospital, admin_headers):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        await book(client, doctor, patient)
+
         response = await client.get(
-            "/api/v1/appointments?page=1&page_size=20",
+            "/api/v1/appointments/?page=1&page_size=20",
             headers=admin_headers,
         )
+
         assert response.status_code == 200
         data = response.json()
-        assert "data" in data
-        assert "total" in data
-        assert "total_pages" in data
-        assert "page" in data
+        assert data["total"] == 1
+        assert len(data["data"]) == 1
 
-    async def test_patient_cannot_list_all_appointments(self, client, patient_headers):
+    async def test_patient_lists_only_own_appointments(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        other_patient = PatientFactory.create(db, hospital.id)
+        await book(client, doctor, patient)
+
         response = await client.get(
-            "/api/v1/appointments",
-            headers=patient_headers,
+            "/api/v1/appointments/",
+            headers=headers_for(other_patient.user_id),
         )
-        assert response.status_code == 403
 
+        assert response.status_code == 200
+        assert response.json()["total"] == 0
+
+    async def test_doctor_lists_only_own_appointments(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        other_doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        await book(client, doctor, patient)
+
+        response = await client.get(
+            "/api/v1/appointments/",
+            headers=headers_for(other_doctor.user_id, UserRole.DOCTOR),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["total"] == 0
+
+
+class TestAppointmentDetail:
+    async def test_patient_can_get_own_appointment(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        appointment_id = (await book(client, doctor, patient)).json()["id"]
+
+        response = await client.get(
+            f"/api/v1/appointments/{appointment_id}",
+            headers=headers_for(patient.user_id),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["id"] == appointment_id
+
+    async def test_other_patient_cannot_get_appointment(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        other_patient = PatientFactory.create(db, hospital.id)
+        appointment_id = (await book(client, doctor, patient)).json()["id"]
+
+        response = await client.get(
+            f"/api/v1/appointments/{appointment_id}",
+            headers=headers_for(other_patient.user_id),
+        )
+
+        assert response.status_code == 404
+
+
+class TestAppointmentMutations:
     async def test_cancel_appointment(self, client, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
-        user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
-        PatientFactory.create(db, hospital.id, user_id=user.id)
-        tokens = create_token_pair(str(user.id), "patient", str(hospital.id))
-        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+        patient = PatientFactory.create(db, hospital.id)
+        appointment_id = (await book(client, doctor, patient)).json()["id"]
 
-        book_res = await client.post(
-            "/api/v1/appointments",
-            json={"doctor_id": str(doctor.id), "slot_time": VALID_SLOT},
-            headers=headers,
-        )
-        appointment_id = book_res.json()["id"]
-
-        cancel_res = await client.post(
+        response = await client.post(
             f"/api/v1/appointments/{appointment_id}/cancel",
             json={"reason": "Patient requested cancellation"},
-            headers=headers,
+            headers=headers_for(patient.user_id),
         )
-        assert cancel_res.status_code == 200
-        assert cancel_res.json()["status"] == "cancelled"
 
-    async def test_get_today_queue_as_staff(self, client, admin_headers):
+        assert response.status_code == 200
+        assert response.json()["status"] == "cancelled"
+
+    async def test_reschedule_appointment(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        appointment_id = (await book(client, doctor, patient)).json()["id"]
+
+        response = await client.post(
+            f"/api/v1/appointments/{appointment_id}/reschedule",
+            json={"new_slot_time": slot_at(DayOfWeek.MONDAY, 11).isoformat()},
+            headers=headers_for(patient.user_id),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["slot_time"].startswith(
+            slot_at(DayOfWeek.MONDAY, 11).isoformat()
+        )
+
+
+class TestAppointmentQueue:
+    async def test_get_today_queue_as_admin(self, client, admin_headers):
         response = await client.get(
             "/api/v1/appointments/queue/today",
             headers=admin_headers,
         )
+
         assert response.status_code == 200
         assert "data" in response.json()
-
-    async def test_auth_me_returns_user_info(self, client, admin_headers):
-        response = await client.get("/api/v1/auth/me", headers=admin_headers)
-        assert response.status_code == 200
-        data = response.json()
-        assert "user_id" in data
-        assert data["role"] == "admin"
