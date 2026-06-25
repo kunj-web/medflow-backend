@@ -4,6 +4,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 try:
     import resend
@@ -84,7 +85,7 @@ class NotificationService:
 
     def send_push(
         self,
-        user_id: str,
+        user_id: UUID | str,
         title: str,
         body: str,
         data: dict[str, str] | None = None,
@@ -104,8 +105,9 @@ class NotificationService:
             logger.warning("send_push called without db session — skipping DB write")
             return
 
+        user_uuid = _coerce_uuid(user_id)
         notification_repo = NotificationRepository(db)
-        devices = notification_repo.get_user_devices(user_id)
+        devices = notification_repo.get_user_devices(user_uuid)
 
         if not devices:
             logger.debug("No registered devices for user %s — skipping push", user_id)
@@ -122,9 +124,8 @@ class NotificationService:
         # Persist notification record
         self._persist_notification(
             db=db,
-            user_id=user_id,
-            hospital_id=hospital_id,
-            notification_type=NotificationType.PUSH,
+            user_id=user_uuid,
+            notification_type=_notification_type_from_data(data),
             title=title,
             body=body,
             data=data,
@@ -354,8 +355,7 @@ class NotificationService:
     def _persist_notification(
         self,
         db: Session,
-        user_id: str,
-        hospital_id: str | None,
+        user_id: UUID,
         notification_type: NotificationType,
         title: str,
         body: str,
@@ -365,10 +365,9 @@ class NotificationService:
         try:
             notification = Notification(
                 user_id=user_id,
-                hospital_id=hospital_id,
                 type=notification_type,
                 title=title,
-                body=body,
+                message=body,
                 data=data or {},
             )
             db.add(notification)
@@ -425,6 +424,21 @@ def get_reminder_appointments_for_offset(
 def _fmt_slot(slot_time: datetime) -> str:
     """Format a naive UTC slot_time for display. e.g. 'Mon, 9 Jun 2025 at 10:30 AM'"""
     return f"{slot_time.strftime('%a,')} {slot_time.day} {slot_time.strftime('%b %Y at %I:%M %p')}"
+
+
+def _coerce_uuid(value: UUID | str) -> UUID:
+    if isinstance(value, UUID):
+        return value
+    return UUID(value)
+
+
+def _notification_type_from_data(data: dict[str, str] | None) -> NotificationType:
+    if data and data.get("type"):
+        try:
+            return NotificationType(data["type"])
+        except ValueError:
+            logger.warning("Unknown notification type %s; using general", data["type"])
+    return NotificationType.GENERAL
 
 
 def _render_booked_email(
