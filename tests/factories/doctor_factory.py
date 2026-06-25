@@ -32,6 +32,7 @@ class DoctorFactory:
             email=kwargs.get("email", fake.unique.email()),
             registration_number=kwargs.get("registration_number", fake.unique.numerify("REG#####")),
             specialization=kwargs.get("specialization", fake.random_element(SPECIALIZATIONS)),
+            qualification=kwargs.get("qualification", "MBBS"),
             consultation_fee=kwargs.get("consultation_fee", 500),
             experience_years=kwargs.get("experience_years", 5),
             is_active=kwargs.get("is_active", True),
