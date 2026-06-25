@@ -1,6 +1,6 @@
 import sqlalchemy as sa
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Numeric, String, Text, Uuid
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel, HospitalScopedMixin
@@ -23,18 +23,18 @@ class Invoice(BaseModel, HospitalScopedMixin):
         Index("ix_invoice_hospital", "hospital_id"),
     )
     appointment_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("appointments.id", ondelete="RESTRICT"),
         nullable=False,
         unique=True,
     )
     patient_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("patients.id", ondelete="RESTRICT"),
         nullable=False,
     )
     invoice_number = Column(String(50), nullable=False, unique=True)
-    line_items = Column(JSONB, nullable=False, default=list)
+    line_items = Column(sa.JSON().with_variant(JSONB, "postgresql"), nullable=False, default=list)
     subtotal = Column(Numeric(10, 2), nullable=False, default=0)
     discount_amount = Column(Numeric(10, 2), default=0)
     total_amount = Column(Numeric(10, 2), nullable=False, default=0)

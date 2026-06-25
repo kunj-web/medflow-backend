@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Any
 
-import resend
-from firebase_admin import credentials, messaging
-from firebase_admin import get_app as firebase_get_app
-from firebase_admin import initialize_app as firebase_initialize_app
+try:
+    import resend
+except ImportError:  # pragma: no cover - optional notification dependency
+    resend = None
+
+try:
+    from firebase_admin import credentials, messaging
+    from firebase_admin import get_app as firebase_get_app
+    from firebase_admin import initialize_app as firebase_initialize_app
+except ImportError:  # pragma: no cover - optional notification dependency
+    credentials = None
+    messaging = None
+    firebase_get_app = None
+    firebase_initialize_app = None
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -23,10 +34,12 @@ logger = logging.getLogger(__name__)
 # Firebase initialisation — runs once at import time
 # ---------------------------------------------------------------------------
 
-import os
-
 def _init_firebase() -> None:
     """Initialize Firebase only if credentials file exists."""
+    if credentials is None or firebase_get_app is None or firebase_initialize_app is None:
+        logger.warning("firebase-admin is not installed. Push notifications disabled.")
+        return
+
     if not os.path.exists(settings.firebase_credentials_path):
         logger.warning(
             "Firebase credentials not found (%s). Push notifications disabled.",
@@ -62,7 +75,8 @@ class NotificationService:
     """
 
     def __init__(self) -> None:
-        resend.api_key = settings.resend_api_key
+        if resend is not None:
+            resend.api_key = settings.resend_api_key
 
     # -----------------------------------------------------------------------
     # Core — Push
@@ -99,6 +113,10 @@ class NotificationService:
 
         tokens = [d.fcm_token for d in devices if d.fcm_token]
         if not tokens:
+            return
+
+        if messaging is None:
+            logger.warning("firebase-admin is not installed. Push notification skipped.")
             return
 
         # Persist notification record
@@ -156,6 +174,10 @@ class NotificationService:
         the calling service transaction.
         """
         try:
+            if resend is None:
+                logger.warning("resend is not installed. Email notification skipped.")
+                return
+
             resend.Emails.send({
                 "from": settings.email_from,
                 "to": to,

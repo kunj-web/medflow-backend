@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from app.models.enums import InvoiceStatus
 from app.schemas.validators.common import validate_non_empty_string, validate_positive_amount
@@ -78,6 +78,10 @@ class PaymentRequest(BaseModel):
         if v.lower() not in allowed:
             raise ValueError(f"payment_method must be one of {allowed}")
         return v.lower()
+
+
+class PaymentCreate(PaymentRequest):
+    amount_paid: float = Field(validation_alias=AliasChoices("amount_paid", "amount"))
 
 
 class InvoiceResponse(BaseModel):

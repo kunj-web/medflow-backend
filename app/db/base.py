@@ -1,8 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, DateTime, ForeignKey, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, declared_attr
 
 
@@ -50,7 +49,7 @@ class HospitalScopedMixin:
     @declared_attr
     def hospital_id(cls):
         return Column(
-            UUID(as_uuid=True),
+            Uuid(as_uuid=True),
             ForeignKey("hospitals.id", ondelete="SET NULL"),
             nullable=True,
             index=True,
@@ -66,7 +65,7 @@ class BaseModel(Base, TimestampMixin, SoftDeleteMixin):
     __abstract__ = True
 
     id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
         nullable=False,

@@ -1,38 +1,37 @@
 # Web framework
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
+fastapi>=0.111,<1.0
+uvicorn[standard]>=0.29,<1.0
 
 # Database
-sqlalchemy==2.0.30
-alembic==1.13.1
-psycopg2-binary==2.9.9
+sqlalchemy>=2.0.43,<3.0
+alembic>=1.13,<2.0
+psycopg[binary]>=3.2,<4.0
 
 # Auth
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.9
+python-jose[cryptography]>=3.3,<4.0
+passlib[bcrypt]>=1.7,<2.0
+python-multipart>=0.0.9,<1.0
 
 # Config
-pydantic==2.7.1
-pydantic-settings==2.2.1
-pydantic[email]==2.7.1
+pydantic[email]>=2.12,<3.0
+pydantic-settings>=2.7,<3.0
 
 # Email
-resend==1.1.0
+resend>=1.1,<3.0
 
 # Push notifications
-firebase-admin==6.5.0
+firebase-admin>=6.5,<8.0
 
-# File storage — Cloudflare R2 (S3-compatible)
-boto3==1.34.101
+# File storage - Cloudflare R2 (S3-compatible)
+boto3>=1.34,<2.0
 
 # Testing
-pytest==8.2.0
-pytest-asyncio==0.23.6
-httpx==0.27.0
-factory-boy==3.3.0
+pytest>=8.4,<10.0
+pytest-asyncio>=0.24,<2.0
+httpx>=0.27,<1.0
+factory-boy>=3.3,<4.0
 
 # Dev utilities
-python-dotenv==1.0.1
+python-dotenv>=1.0,<2.0
 
-argon2-cffi==23.1.0
+argon2-cffi>=23.1,<26.0

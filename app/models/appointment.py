@@ -1,6 +1,5 @@
 import sqlalchemy as sa
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Text, Uuid
 from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel, HospitalScopedMixin
@@ -33,12 +32,12 @@ class Appointment(BaseModel, HospitalScopedMixin):
     )
 
     patient_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("patients.id", ondelete="RESTRICT"),
         nullable=False,
     )
     doctor_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("doctors.id", ondelete="RESTRICT"),
         nullable=False,
     )

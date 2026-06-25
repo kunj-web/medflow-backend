@@ -1,6 +1,5 @@
 import sqlalchemy as sa
-from sqlalchemy import Boolean, Column, ForeignKey, Index, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Column, ForeignKey, Index, String, Text, Uuid
 from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel
@@ -15,12 +14,12 @@ class Notification(BaseModel):
     )
 
     user_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
     appointment_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("appointments.id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -44,7 +43,7 @@ class UserDevice(BaseModel):
     )
 
     user_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )

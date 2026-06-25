@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -12,6 +12,27 @@ class Settings(BaseSettings):
     # Database
     # ------------------------------------------------------------------
     database_url: str
+    test_database_url: str | None = None
+
+    @property
+    def sqlalchemy_database_url(self) -> str:
+        """
+        Keep existing postgresql:// env values valid while using SQLAlchemy's
+        modern psycopg driver instead of the old psycopg2 default.
+        """
+        if self.database_url.startswith("postgresql://"):
+            return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return self.database_url
+
+    @property
+    def sqlalchemy_test_database_url(self) -> str:
+        if self.test_database_url:
+            if self.test_database_url.startswith("postgresql://"):
+                return self.test_database_url.replace(
+                    "postgresql://", "postgresql+psycopg://", 1
+                )
+            return self.test_database_url
+        return "sqlite+pysqlite:///./.pytest_cache/medflow_test.db"
 
     # ------------------------------------------------------------------
     # JWT
@@ -50,9 +71,7 @@ class Settings(BaseSettings):
         """Split comma-separated CORS_ORIGINS into a list."""
         return [origin.strip() for origin in self.cors_origins.split(",")]
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 
 settings = Settings()

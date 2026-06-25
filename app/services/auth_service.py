@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -187,9 +189,14 @@ class AuthService:
         if not payload or payload.get("type") != "refresh":
             raise ValueError("Invalid refresh token")
 
-        user_id = payload.get("sub")
-        if not user_id:
+        raw_user_id = payload.get("sub")
+        if not raw_user_id:
             raise ValueError("Invalid refresh token")
+
+        try:
+            user_id = UUID(raw_user_id)
+        except ValueError as exc:
+            raise ValueError("Invalid refresh token") from exc
 
         user = self.db.query(User).filter(
             User.id == user_id,

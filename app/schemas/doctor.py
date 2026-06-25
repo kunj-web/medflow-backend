@@ -36,6 +36,9 @@ class ScheduleCreate(BaseModel):
         return v
 
 
+ScheduleUpsert = ScheduleCreate
+
+
 class ScheduleResponse(BaseModel):
     id: UUID
     day_of_week: DayOfWeek
