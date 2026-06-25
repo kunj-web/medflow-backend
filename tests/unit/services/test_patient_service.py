@@ -1,154 +1,161 @@
-"""
-tests/unit/services/test_patient_service.py
+from datetime import date, datetime, time, timedelta
 
-Covers:
-- Patient + User created in one transaction
-- Duplicate phone/email raises
-- Search by name, phone
-- Appointment history scoped to patient
-- Hospital scoping
-"""
-import pytest
-
-from app.models.enums import UserRole
-from app.schemas.patient import PatientCreate
+from app.models.appointment import Appointment
+from app.models.enums import AppointmentStatus, AppointmentType, DayOfWeek, UserRole
+from app.schemas.pagination import PaginationParams
+from app.schemas.patient import PatientUpdate
 from app.services.patient_service import PatientService
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.patient_factory import PatientFactory
 from tests.factories.user_factory import UserFactory
 
 
-class TestPatientServiceCreate:
-
-    def test_creates_user_and_patient_together(self, db, hospital):
-        service = PatientService(db)
-        data = PatientCreate(
-            email="patient1@test.com",
-            phone="9000000001",
-            password="Test@1234",
-            first_name="Sneha",
-            last_name="Rao",
-            gender="female",
-        )
-        patient = service.create(data, hospital_id=hospital.id)
-
-        assert patient.id is not None
-        assert patient.user_id is not None
-        assert patient.first_name == "Sneha"
-        assert patient.last_name == "Rao"
-        assert patient.hospital_id == hospital.id
-
-    def test_duplicate_email_raises(self, db, hospital):
-        PatientFactory.create(db, hospital.id, email="taken@test.com")
-        service = PatientService(db)
-        data = PatientCreate(
-            email="taken@test.com",
-            phone="9000000002",
-            password="Test@1234",
-            first_name="Another",
-            last_name="Person",
-            gender="male",
-        )
-        with pytest.raises(ValueError, match="email"):
-            service.create(data, hospital_id=hospital.id)
-
-    def test_duplicate_phone_raises(self, db, hospital):
-        PatientFactory.create(db, hospital.id, phone="9111111111")
-        service = PatientService(db)
-        data = PatientCreate(
-            email="unique@test.com",
-            phone="9111111111",  # duplicate
-            password="Test@1234",
-            first_name="Test",
-            last_name="User",
-            gender="male",
-        )
-        with pytest.raises(ValueError, match="phone"):
-            service.create(data, hospital_id=hospital.id)
+def next_weekday(day: DayOfWeek) -> date:
+    target = list(DayOfWeek).index(day)
+    today = date.today()
+    days_ahead = (target - today.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7
+    return today + timedelta(days=days_ahead)
 
 
-class TestPatientSearch:
+def create_appointment(db, patient, doctor, slot_time=None):
+    starts_at = slot_time or datetime.combine(next_weekday(DayOfWeek.MONDAY), time(9, 0))
+    appointment = Appointment(
+        hospital_id=doctor.hospital_id,
+        patient_id=patient.id,
+        doctor_id=doctor.id,
+        slot_time=starts_at,
+        end_time=starts_at + timedelta(minutes=15),
+        status=AppointmentStatus.SCHEDULED,
+        type=AppointmentType.CONSULTATION,
+        token_number=1,
+    )
+    db.add(appointment)
+    db.flush()
+    return appointment
 
-    def test_search_by_first_name(self, db, hospital):
+
+class TestPatientProfile:
+    def test_get_profile_for_user(self, db, hospital):
+        user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
+        patient = PatientFactory.create(db, hospital.id, user_id=user.id)
+
+        result = PatientService(db).get_profile_for_user(user.id)
+
+        assert result.id == patient.id
+
+    def test_get_by_id_with_appointments(self, db, hospital):
+        patient = PatientFactory.create(db, hospital.id)
+        doctor = DoctorFactory.create(db, hospital.id)
+        create_appointment(db, patient, doctor)
+
+        result = PatientService(db).get_by_id_with_appointments(patient.id)
+
+        assert result.id == patient.id
+        assert len(result.appointments) == 1
+
+
+class TestPatientListing:
+    def test_list_all_returns_paginated_patients(self, db, hospital):
+        PatientFactory.create(db, hospital.id)
+        PatientFactory.create(db, hospital.id)
+
+        result = PatientService(db).list_all(PaginationParams(page=1, page_size=1))
+
+        assert len(result.data) == 1
+        assert result.total == 2
+        assert result.total_pages == 2
+
+    def test_list_all_searches_by_name(self, db, hospital):
         PatientFactory.create(db, hospital.id, first_name="Ramesh", last_name="Kumar")
         PatientFactory.create(db, hospital.id, first_name="Suresh", last_name="Patel")
-        service = PatientService(db)
 
-        results = service.search(query="Ramesh", hospital_id=hospital.id)
-        assert len(results) >= 1
-        assert any(p.first_name == "Ramesh" for p in results)
+        result = PatientService(db).list_all(
+            PaginationParams(page=1, page_size=20),
+            search="Ramesh",
+        )
 
-    def test_search_by_phone(self, db, hospital):
+        assert len(result.data) == 1
+        assert result.data[0].first_name == "Ramesh"
+
+    def test_list_all_searches_by_phone(self, db, hospital):
         PatientFactory.create(db, hospital.id, phone="9888888888")
-        service = PatientService(db)
 
-        results = service.search(query="9888888888", hospital_id=hospital.id)
-        assert len(results) >= 1
-        assert any(p.phone == "9888888888" for p in results)
+        result = PatientService(db).list_all(
+            PaginationParams(page=1, page_size=20),
+            search="9888888888",
+        )
 
-    def test_search_returns_only_own_hospital(self, db, hospital):
-        from app.models.hospital import Hospital
-        other = Hospital(name="Other", primary_color="#000000", currency="INR", timezone="Asia/Kolkata")
-        db.add(other)
-        db.flush()
+        assert len(result.data) == 1
+        assert result.data[0].phone == "9888888888"
 
-        PatientFactory.create(db, other.id, first_name="Ghost", last_name="Patient")
-        PatientFactory.create(db, hospital.id, first_name="Real", last_name="Patient")
-        service = PatientService(db)
 
-        results = service.search(query="Patient", hospital_id=hospital.id)
-        assert all(p.hospital_id == hospital.id for p in results)
-        assert not any(p.first_name == "Ghost" for p in results)
+class TestPatientUpdateDelete:
+    def test_update_patient_and_linked_user_contact(self, db, hospital):
+        user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
+        patient = PatientFactory.create(db, hospital.id, user_id=user.id)
 
-    def test_search_empty_query_returns_all(self, db, hospital):
-        PatientFactory.create(db, hospital.id)
-        PatientFactory.create(db, hospital.id)
-        service = PatientService(db)
+        result = PatientService(db).update(
+            patient.id,
+            PatientUpdate(
+                first_name="Updated",
+                phone="9876543210",
+                email="updated@test.com",
+            ),
+        )
 
-        results = service.search(query="", hospital_id=hospital.id)
-        assert len(results) >= 2
+        db.refresh(user)
+        assert result.first_name == "Updated"
+        assert result.phone == "9876543210"
+        assert user.phone == "9876543210"
+        assert user.email == "updated@test.com"
+
+    def test_delete_soft_deletes_patient(self, db, hospital):
+        patient = PatientFactory.create(db, hospital.id)
+
+        PatientService(db).delete(patient.id)
+
+        assert PatientService(db).get_profile_for_user(patient.user_id) is None
+
+
+class TestPatientAccess:
+    def test_doctor_has_access_after_appointment(self, db, hospital):
+        patient = PatientFactory.create(db, hospital.id)
+        doctor = DoctorFactory.create(db, hospital.id)
+        create_appointment(db, patient, doctor)
+
+        assert PatientService(db).doctor_has_access(patient.id, doctor.user_id) is True
+
+    def test_doctor_without_appointment_has_no_access(self, db, hospital):
+        patient = PatientFactory.create(db, hospital.id)
+        doctor = DoctorFactory.create(db, hospital.id)
+
+        assert PatientService(db).doctor_has_access(patient.id, doctor.user_id) is False
 
 
 class TestPatientAppointmentHistory:
-
     def test_appointment_history_scoped_to_patient(self, db, hospital):
-        from datetime import datetime
-
-        from app.models.enums import AppointmentType
-        from app.schemas.appointment import AppointmentCreate
-        from app.services.appointment_service import AppointmentService
-
         doctor = DoctorFactory.create(db, hospital.id)
         patient1 = PatientFactory.create(db, hospital.id)
         patient2 = PatientFactory.create(db, hospital.id)
-        user = UserFactory.create(db, hospital.id, role=UserRole.PATIENT)
-
-        apt_service = AppointmentService(db)
-        apt_service.book(
-            data=AppointmentCreate(
-                doctor_id=doctor.id,
-                slot_time=datetime(2025, 6, 2, 9, 0, 0),
-                type=AppointmentType.CONSULTATION,
-            ),
-            hospital_id=hospital.id,
-            patient_id=patient1.id,
-            user_id=user.id,
+        create_appointment(
+            db,
+            patient1,
+            doctor,
+            datetime.combine(next_weekday(DayOfWeek.MONDAY), time(9, 0)),
         )
-        apt_service.book(
-            data=AppointmentCreate(
-                doctor_id=doctor.id,
-                slot_time=datetime(2025, 6, 2, 9, 15, 0),
-                type=AppointmentType.CONSULTATION,
-            ),
-            hospital_id=hospital.id,
-            patient_id=patient2.id,
-            user_id=user.id,
+        create_appointment(
+            db,
+            patient2,
+            doctor,
+            datetime.combine(next_weekday(DayOfWeek.MONDAY), time(9, 15)),
         )
 
-        service = PatientService(db)
-        history = service.get_appointment_history(
-            patient_id=patient1.id,
-            hospital_id=hospital.id,
+        history = PatientService(db).get_appointment_history(
+            patient1.id,
+            PaginationParams(page=1, page_size=20),
         )
-        assert all(a.patient_id == patient1.id for a in history)
-        assert len(history) == 1
+
+        assert history.total == 1
+        assert history.data[0].patient.id == patient1.id
