@@ -1,6 +1,5 @@
 import sqlalchemy as sa
-from sqlalchemy import Boolean, Column, ForeignKey, Index, Numeric, String, Text, Time
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Column, ForeignKey, Index, Numeric, String, Text, Time, Uuid
 from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel, HospitalScopedMixin
@@ -15,7 +14,7 @@ class Doctor(BaseModel, HospitalScopedMixin):
         Index("ix_doctor_hospital", "hospital_id"),
     )
     user_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
         unique=True,
@@ -72,7 +71,7 @@ class DoctorSchedule(BaseModel):
     )
 
     doctor_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("doctors.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -93,7 +92,7 @@ class DoctorLeave(BaseModel):
     )
 
     doctor_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("doctors.id", ondelete="CASCADE"),
         nullable=False,
     )

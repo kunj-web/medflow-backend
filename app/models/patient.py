@@ -1,6 +1,5 @@
 import sqlalchemy as sa
-from sqlalchemy import Column, Date, ForeignKey, Index, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, Date, ForeignKey, Index, String, Text, Uuid
 from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel
@@ -13,7 +12,7 @@ class Patient(BaseModel):
         Index("ix_patient_user_id", "user_id"),
     )
     user_id = Column(
-        UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
         unique=True,
