@@ -93,6 +93,8 @@ class BillingService:
             invoice.status = InvoiceStatus.PAID
             invoice.paid_at = datetime.now(UTC)
             invoice.balance_due = 0.0
+        else:
+            invoice.status = InvoiceStatus.PARTIALLY_PAID
         self.db.commit()
         self.db.refresh(invoice)
         return self._to_response(invoice)
