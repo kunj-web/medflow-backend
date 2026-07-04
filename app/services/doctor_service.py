@@ -170,6 +170,9 @@ class DoctorService:
 
     def get_slots(self, doctor_id: UUID, target_date: date) -> list[SlotResponse]:
         self.get_public_by_id(doctor_id)
+        if target_date <= date.today():
+            return []
+
         day_enum = list(DayOfWeek)[target_date.weekday()]
         schedule = self.doctor_repo.get_schedule_for_day(doctor_id, day_enum)
         if not schedule or self.doctor_repo.get_leave_for_date(doctor_id, target_date):
@@ -178,7 +181,10 @@ class DoctorService:
         appointments = self.appointment_repo.get_doctor_appointments_for_date(
             doctor_id, target_date
         )
-        taken = {appointment.slot_time for appointment in appointments}
+        taken = {
+            appointment.slot_time.replace(tzinfo=None)
+            for appointment in appointments
+        }
         delta = timedelta(minutes=schedule.slot_duration_minutes)
         current = datetime.combine(target_date, schedule.start_time)
         end = datetime.combine(target_date, schedule.end_time)
