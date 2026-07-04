@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -19,6 +19,8 @@ class AppointmentService:
         self.doctor_repo = DoctorRepository(db)
 
     def book(self, data: AppointmentCreate, patient_user_id: UUID) -> Appointment:
+        self._ensure_advance_booking(data.slot_time.date())
+
         patient = (
             self.db.query(Patient)
             .filter(
@@ -119,6 +121,8 @@ class AppointmentService:
         if appointment.status == AppointmentStatus.COMPLETED:
             raise ValueError("Cannot reschedule a completed appointment")
 
+        self._ensure_advance_booking(data.new_slot_time.date())
+
         schedule = self.doctor_repo.get_schedule_for_day(
             appointment.doctor_id,
             DayOfWeek(data.new_slot_time.strftime("%A").lower()),
@@ -171,3 +175,8 @@ class AppointmentService:
         if not owns_appointment:
             raise PermissionError("Access denied")
         return appointment
+
+    @staticmethod
+    def _ensure_advance_booking(slot_date: date) -> None:
+        if slot_date <= date.today():
+            raise ValueError("Appointments must be booked at least one day in advance")
