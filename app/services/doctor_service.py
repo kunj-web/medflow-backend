@@ -115,6 +115,60 @@ class DoctorService:
         self.db.refresh(schedule)
         return ScheduleResponse.model_validate(schedule)
 
+    def list_schedules(
+        self,
+        doctor_id: UUID,
+        actor_user_id: UUID,
+        is_website_admin: bool,
+    ) -> list[ScheduleResponse]:
+        doctor = self._get_owned_or_admin(doctor_id, actor_user_id, is_website_admin)
+        schedules = sorted(
+            [schedule for schedule in doctor.schedules if schedule.deleted_at is None],
+            key=lambda schedule: list(DayOfWeek).index(schedule.day_of_week),
+        )
+        return [ScheduleResponse.model_validate(schedule) for schedule in schedules]
+
+    def replace_weekly_schedule(
+        self,
+        doctor_id: UUID,
+        payload: list[ScheduleCreate],
+        actor_user_id: UUID,
+        is_website_admin: bool,
+    ) -> list[ScheduleResponse]:
+        doctor = self._get_owned_or_admin(doctor_id, actor_user_id, is_website_admin)
+        existing_by_day = {
+            schedule.day_of_week: schedule
+            for schedule in doctor.schedules
+            if schedule.deleted_at is None
+        }
+        requested_by_day = {schedule.day_of_week: schedule for schedule in payload}
+
+        for day, schedule in existing_by_day.items():
+            if day not in requested_by_day:
+                self.db.delete(schedule)
+
+        for day, schedule_payload in requested_by_day.items():
+            existing = existing_by_day.get(day)
+            if existing:
+                existing.start_time = schedule_payload.start_time
+                existing.end_time = schedule_payload.end_time
+                existing.slot_duration_minutes = schedule_payload.slot_duration_minutes
+                existing.is_active = True
+                continue
+
+            self.db.add(
+                DoctorSchedule(
+                    doctor_id=doctor.id,
+                    day_of_week=schedule_payload.day_of_week,
+                    start_time=schedule_payload.start_time,
+                    end_time=schedule_payload.end_time,
+                    slot_duration_minutes=schedule_payload.slot_duration_minutes,
+                )
+            )
+
+        self.db.commit()
+        return self.list_schedules(doctor_id, actor_user_id, is_website_admin)
+
     def delete_schedule(
         self,
         doctor_id: UUID,

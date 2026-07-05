@@ -155,4 +155,31 @@ class TestDoctorSchedule:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
-        assert len(data) == 32
+        assert len(data) == 48
+
+    async def test_owner_doctor_can_replace_weekly_schedule(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+
+        response = await client.post(
+            f"/api/v1/doctors/{doctor.id}/schedules",
+            json=[
+                {
+                    "day_of_week": "monday",
+                    "start_time": "08:00",
+                    "end_time": "18:00",
+                    "slot_duration_minutes": 10,
+                },
+                {
+                    "day_of_week": "sunday",
+                    "start_time": "10:00",
+                    "end_time": "12:00",
+                    "slot_duration_minutes": 5,
+                },
+            ],
+            headers=headers_for(doctor.user_id),
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert [item["day_of_week"] for item in data] == ["monday", "sunday"]
+        assert data[1]["slot_duration_minutes"] == 5

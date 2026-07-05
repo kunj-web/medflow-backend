@@ -88,8 +88,8 @@ class HospitalUpdate(BaseModel):
     @field_validator("appointment_slot_duration_minutes")
     @classmethod
     def valid_slot_duration(cls, v: int | None) -> int | None:
-        if v is not None and v not in (10, 15, 20, 30, 60):
-            raise ValueError("appointment_slot_duration_minutes must be 10, 15, 20, 30, or 60")
+        if v is not None and v not in (5, 10, 15, 20, 30, 60):
+            raise ValueError("appointment_slot_duration_minutes must be 5, 10, 15, 20, 30, or 60")
         return v
 
     @field_validator("max_advance_booking_days", "cancellation_cutoff_hours")

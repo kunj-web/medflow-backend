@@ -51,6 +51,7 @@ class DoctorFactory:
                 day_of_week=day,
                 start_time=time(9, 0),
                 end_time=time(17, 0),
+                slot_duration_minutes=10,
             ))
 
         db.flush()

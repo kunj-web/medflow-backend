@@ -30,7 +30,12 @@ class AppointmentRepository(BaseRepository[Appointment]):
         )
 
     def get_paginated_for_patient_user(
-        self, user_id: UUID, page: int, page_size: int
+        self,
+        user_id: UUID,
+        page: int,
+        page_size: int,
+        status: AppointmentStatus | None = None,
+        target_date: date | None = None,
     ) -> PaginatedResult:
         query = self._with_relations(self.db.query(Appointment)).join(
             Patient, Appointment.patient_id == Patient.id
@@ -39,10 +44,16 @@ class AppointmentRepository(BaseRepository[Appointment]):
             Patient.deleted_at.is_(None),
             Appointment.deleted_at.is_(None),
         )
+        query = self._apply_filters(query, status, target_date)
         return self._paginate(query, page, page_size)
 
     def get_paginated_for_doctor_user(
-        self, user_id: UUID, page: int, page_size: int
+        self,
+        user_id: UUID,
+        page: int,
+        page_size: int,
+        status: AppointmentStatus | None = None,
+        target_date: date | None = None,
     ) -> PaginatedResult:
         query = self._with_relations(self.db.query(Appointment)).join(
             Doctor, Appointment.doctor_id == Doctor.id
@@ -51,13 +62,32 @@ class AppointmentRepository(BaseRepository[Appointment]):
             Doctor.deleted_at.is_(None),
             Appointment.deleted_at.is_(None),
         )
+        query = self._apply_filters(query, status, target_date)
         return self._paginate(query, page, page_size)
 
-    def get_paginated_all(self, page: int, page_size: int) -> PaginatedResult:
+    def get_paginated_all(
+        self,
+        page: int,
+        page_size: int,
+        status: AppointmentStatus | None = None,
+        target_date: date | None = None,
+    ) -> PaginatedResult:
         query = self._with_relations(self.db.query(Appointment)).filter(
             Appointment.deleted_at.is_(None)
         )
+        query = self._apply_filters(query, status, target_date)
         return self._paginate(query, page, page_size)
+
+    @staticmethod
+    def _apply_filters(query, status: AppointmentStatus | None, target_date: date | None):
+        if status is not None:
+            query = query.filter(Appointment.status == status)
+        if target_date is not None:
+            query = query.filter(
+                Appointment.slot_time >= datetime.combine(target_date, datetime.min.time()),
+                Appointment.slot_time < datetime.combine(target_date, datetime.max.time()),
+            )
+        return query
 
     @staticmethod
     def _paginate(query, page: int, page_size: int) -> PaginatedResult:

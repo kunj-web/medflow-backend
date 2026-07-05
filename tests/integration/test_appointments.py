@@ -1,7 +1,9 @@
 from datetime import date, datetime, time, timedelta
+from uuid import UUID
 
 from app.core.security import create_token_pair
-from app.models.enums import AccountStatus, DayOfWeek, UserRole
+from app.models.appointment import Appointment
+from app.models.enums import AccountStatus, AppointmentStatus, DayOfWeek, UserRole
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.patient_factory import PatientFactory
 from tests.factories.user_factory import UserFactory
@@ -126,6 +128,28 @@ class TestAppointmentListing:
 
         assert response.status_code == 200
         assert response.json()["total"] == 0
+
+    async def test_status_filter_is_applied(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        appointment_id = (await book(client, doctor, patient)).json()["id"]
+        appointment = db.get(Appointment, UUID(appointment_id))
+        appointment.status = AppointmentStatus.COMPLETED
+        db.commit()
+
+        scheduled = await client.get(
+            "/api/v1/appointments/?status=scheduled",
+            headers=headers_for(patient.user_id),
+        )
+        completed = await client.get(
+            "/api/v1/appointments/?status=completed",
+            headers=headers_for(patient.user_id),
+        )
+
+        assert scheduled.status_code == 200
+        assert scheduled.json()["total"] == 0
+        assert completed.status_code == 200
+        assert completed.json()["total"] == 1
 
 
 class TestAppointmentDetail:
