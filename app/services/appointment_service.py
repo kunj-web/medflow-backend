@@ -46,6 +46,7 @@ class AppointmentService:
         slot_time = data.slot_time.time()
         if slot_time < schedule.start_time or slot_time >= schedule.end_time:
             raise ValueError("Slot time is outside doctor's working hours")
+        self._ensure_slot_matches_schedule(data.slot_time, schedule)
 
         leave = self.doctor_repo.get_leave_for_date(doctor.id, data.slot_time.date())
         if leave and leave.is_approved:
@@ -132,6 +133,7 @@ class AppointmentService:
         new_time = data.new_slot_time.time()
         if new_time < schedule.start_time or new_time >= schedule.end_time:
             raise ValueError("Slot time is outside doctor's working hours")
+        self._ensure_slot_matches_schedule(data.new_slot_time, schedule)
 
         existing = self.appointment_repo.get_slot_if_taken(
             appointment.doctor_id, data.new_slot_time
@@ -180,3 +182,16 @@ class AppointmentService:
     def _ensure_advance_booking(slot_date: date) -> None:
         if slot_date <= date.today():
             raise ValueError("Appointments must be booked at least one day in advance")
+
+    @staticmethod
+    def _ensure_slot_matches_schedule(slot_time, schedule) -> None:
+        elapsed_minutes = (
+            slot_time.hour * 60
+            + slot_time.minute
+            - schedule.start_time.hour * 60
+            - schedule.start_time.minute
+        )
+        if elapsed_minutes % schedule.slot_duration_minutes != 0:
+            raise ValueError(
+                f"Slot time must align to {schedule.slot_duration_minutes}-minute intervals"
+            )

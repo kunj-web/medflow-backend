@@ -161,7 +161,7 @@ class TestDoctorLeaveAndSlots:
 
         slots = DoctorService(db).get_slots(doctor.id, target)
 
-        assert len(slots) == 32
+        assert len(slots) == 48
         assert slots[0].datetime.endswith("T09:00:00")
         assert slots[0].is_available is True
 

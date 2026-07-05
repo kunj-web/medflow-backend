@@ -13,7 +13,7 @@ def validate_future_datetime(v: datetime) -> datetime:
 
 def validate_slot_alignment(
     v: datetime,
-    interval: int = 15,
+    interval: int = 5,
 ) -> datetime:
     if v.minute % interval != 0:
         raise ValueError(

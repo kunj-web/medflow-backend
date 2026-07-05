@@ -78,7 +78,7 @@ class DoctorSchedule(BaseModel):
     day_of_week = Column(sa.Enum(DayOfWeek), nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
-    slot_duration_minutes = Column(sa.Integer, default=15)
+    slot_duration_minutes = Column(sa.Integer, default=10)
     is_active = Column(Boolean, default=True)
 
     # Relationships

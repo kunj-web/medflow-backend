@@ -11,7 +11,7 @@ from app.core.dependencies import (
 )
 from app.models.appointment import Appointment
 from app.models.doctor import Doctor
-from app.models.enums import UserRole
+from app.models.enums import AppointmentStatus, UserRole
 from app.models.patient import Patient
 from app.repositories.appointment_repo import AppointmentRepository
 from app.schemas.appointment import (
@@ -85,6 +85,8 @@ def book_appointment(
 def list_appointments(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    status: AppointmentStatus | None = Query(None),
+    date: date | None = Query(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(
         require_role(
@@ -95,11 +97,15 @@ def list_appointments(
     repo = AppointmentRepository(db)
     user_id = UUID(current_user["user_id"])
     if current_user["role"] == UserRole.PATIENT.value:
-        result = repo.get_paginated_for_patient_user(user_id, page, page_size)
+        result = repo.get_paginated_for_patient_user(
+            user_id, page, page_size, status, date
+        )
     elif current_user["role"] == UserRole.DOCTOR.value:
-        result = repo.get_paginated_for_doctor_user(user_id, page, page_size)
+        result = repo.get_paginated_for_doctor_user(
+            user_id, page, page_size, status, date
+        )
     else:
-        result = repo.get_paginated_all(page, page_size)
+        result = repo.get_paginated_all(page, page_size, status, date)
     return PaginatedResponse(
         data=result.data,
         total=result.total,

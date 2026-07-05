@@ -20,7 +20,7 @@ class ScheduleCreate(BaseModel):
     day_of_week: DayOfWeek
     start_time: time
     end_time: time
-    slot_duration_minutes: int = 15
+    slot_duration_minutes: int = 10
 
     @model_validator(mode="after")
     def end_after_start(self) -> ScheduleCreate:
@@ -31,8 +31,8 @@ class ScheduleCreate(BaseModel):
     @field_validator("slot_duration_minutes")
     @classmethod
     def valid_slot_duration(cls, v: int) -> int:
-        if v not in (10, 15, 20, 30, 60):
-            raise ValueError("slot_duration_minutes must be 10, 15, 20, 30, or 60")
+        if v not in (5, 10, 15, 20, 30, 60):
+            raise ValueError("slot_duration_minutes must be 5, 10, 15, 20, 30, or 60")
         return v
 
 

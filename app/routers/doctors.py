@@ -132,6 +132,51 @@ def set_schedule(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
+@router.get(
+    "/{doctor_id}/schedules",
+    response_model=list[ScheduleResponse],
+    dependencies=[Depends(require_active_status)],
+)
+def list_schedules(
+    doctor_id: UUID,
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
+    service: DoctorService = Depends(get_service),
+):
+    try:
+        return service.list_schedules(doctor_id, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@router.post(
+    "/{doctor_id}/schedules",
+    response_model=list[ScheduleResponse],
+    dependencies=[Depends(require_active_status)],
+)
+def replace_weekly_schedule(
+    doctor_id: UUID,
+    payload: list[ScheduleCreate],
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
+    service: DoctorService = Depends(get_service),
+):
+    try:
+        return service.replace_weekly_schedule(
+            doctor_id, payload, *_actor(current_user)
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.delete(
     "/{doctor_id}/schedule/{day}",
     status_code=status.HTTP_204_NO_CONTENT,

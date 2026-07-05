@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from datetime import time
 from uuid import UUID
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.doctor import Doctor
-from app.models.enums import AccountStatus, UserRole, WorkType
+from app.models.doctor import Doctor, DoctorSchedule
+from app.models.enums import AccountStatus, DayOfWeek, UserRole, WorkType
 from app.models.hospital import Hospital
 from app.models.user import User
 from app.schemas.admin_review import (
@@ -50,6 +51,7 @@ class AdminReviewService:
         user.status = AccountStatus.ACTIVE
         user.is_verified = True
         doctor.is_active = True
+        self._ensure_default_schedules(doctor)
 
         self.db.commit()
         self.db.refresh(doctor)
@@ -101,6 +103,30 @@ class AdminReviewService:
         self.db.add(hospital)
         self.db.flush()
         return hospital
+
+    def _ensure_default_schedules(self, doctor: Doctor) -> None:
+        existing_days = {
+            day
+            for (day,) in self.db.query(DoctorSchedule.day_of_week)
+            .filter(
+                DoctorSchedule.doctor_id == doctor.id,
+                DoctorSchedule.deleted_at.is_(None),
+            )
+            .all()
+        }
+        for day in DayOfWeek:
+            if day in existing_days:
+                continue
+            self.db.add(
+                DoctorSchedule(
+                    doctor_id=doctor.id,
+                    day_of_week=day,
+                    start_time=time(9, 0),
+                    end_time=time(17, 0),
+                    slot_duration_minutes=10,
+                    is_active=True,
+                )
+            )
 
     def _get_doctor_or_404(self, doctor_id: UUID) -> Doctor:
         doctor = (

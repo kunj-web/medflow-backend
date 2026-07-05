@@ -1,4 +1,4 @@
-from app.models.doctor import Doctor
+from app.models.doctor import Doctor, DoctorSchedule
 from app.models.enums import AccountStatus
 from app.models.hospital import Hospital
 from app.models.user import User
@@ -92,6 +92,11 @@ class TestAdminDoctorReview:
         user = db.query(User).filter(User.email == "approve-existing@test.com").one()
         assert user.status == AccountStatus.ACTIVE
         assert user.is_verified is True
+        schedules = db.query(DoctorSchedule).filter(
+            DoctorSchedule.doctor_id == doctor.id
+        ).all()
+        assert len(schedules) == 7
+        assert {schedule.slot_duration_minutes for schedule in schedules} == {10}
 
         login = await client.post(
             "/api/v1/auth/login",

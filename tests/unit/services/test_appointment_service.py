@@ -98,8 +98,8 @@ class TestAppointmentServiceBooking:
         for index, slot in enumerate(
             [
                 slot_at(DayOfWeek.MONDAY, 10, 0),
-                slot_at(DayOfWeek.MONDAY, 10, 15),
-                slot_at(DayOfWeek.MONDAY, 10, 30),
+                slot_at(DayOfWeek.MONDAY, 10, 10),
+                slot_at(DayOfWeek.MONDAY, 10, 20),
             ],
             start=1,
         ):
