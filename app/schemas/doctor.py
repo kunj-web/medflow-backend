@@ -74,6 +74,40 @@ class LeaveResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Slot blocks
+# ---------------------------------------------------------------------------
+
+class SlotBlockCreate(BaseModel):
+    block_date: date
+    start_time: time
+    end_time: time
+    reason: str | None = None
+
+    @model_validator(mode="after")
+    def end_after_start(self) -> SlotBlockCreate:
+        if self.end_time <= self.start_time:
+            raise ValueError("end_time must be after start_time")
+        return self
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def clean_reason(cls, v: str | None) -> str | None:
+        if v is not None:
+            return validate_non_empty_string(v)
+        return v
+
+
+class SlotBlockResponse(BaseModel):
+    id: UUID
+    block_date: date
+    start_time: time
+    end_time: time
+    reason: str | None
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
 # Doctor
 # ---------------------------------------------------------------------------
 
@@ -202,3 +236,5 @@ class DoctorResponse(BaseModel):
 class SlotResponse(BaseModel):
     datetime: str          # ISO-8601, e.g. "2025-06-10T09:00:00"
     is_available: bool
+    block_id: UUID | None = None
+    block_reason: str | None = None

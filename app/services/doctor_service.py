@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models.doctor import Doctor, DoctorLeave, DoctorSchedule
+from app.models.doctor import Doctor, DoctorLeave, DoctorSchedule, DoctorSlotBlock
 from app.models.enums import DayOfWeek
 from app.models.user import User
 from app.repositories.appointment_repo import AppointmentRepository
@@ -17,6 +17,8 @@ from app.schemas.doctor import (
     LeaveResponse,
     ScheduleCreate,
     ScheduleResponse,
+    SlotBlockCreate,
+    SlotBlockResponse,
     SlotResponse,
 )
 from app.schemas.pagination import PaginatedResponse, PaginationParams
@@ -208,6 +210,21 @@ class DoctorService:
         self.db.refresh(leave)
         return LeaveResponse.model_validate(leave)
 
+    def list_leaves(
+        self,
+        doctor_id: UUID,
+        actor_user_id: UUID,
+        is_website_admin: bool,
+    ) -> list[LeaveResponse]:
+        self._get_owned_or_admin(doctor_id, actor_user_id, is_website_admin)
+        leaves = (
+            self.db.query(DoctorLeave)
+            .filter(DoctorLeave.doctor_id == doctor_id, DoctorLeave.deleted_at.is_(None))
+            .order_by(DoctorLeave.leave_date)
+            .all()
+        )
+        return [LeaveResponse.model_validate(leave) for leave in leaves]
+
     def cancel_leave(
         self,
         doctor_id: UUID,
@@ -220,6 +237,63 @@ class DoctorService:
         if not leave:
             raise LookupError(f"No leave found for {leave_date}")
         self.db.delete(leave)
+        self.db.commit()
+
+    def list_slot_blocks(
+        self,
+        doctor_id: UUID,
+        target_date: date,
+        actor_user_id: UUID,
+        is_website_admin: bool,
+    ) -> list[SlotBlockResponse]:
+        self._get_owned_or_admin(doctor_id, actor_user_id, is_website_admin)
+        blocks = self.doctor_repo.get_blocks_for_date(doctor_id, target_date)
+        return [SlotBlockResponse.model_validate(block) for block in blocks]
+
+    def add_slot_block(
+        self,
+        doctor_id: UUID,
+        payload: SlotBlockCreate,
+        actor_user_id: UUID,
+        is_website_admin: bool,
+    ) -> SlotBlockResponse:
+        doctor = self._get_owned_or_admin(doctor_id, actor_user_id, is_website_admin)
+        if payload.block_date < date.today():
+            raise ValueError("Cannot block a past date")
+        self._ensure_block_does_not_cover_existing_appointment(doctor.id, payload)
+
+        block = DoctorSlotBlock(
+            doctor_id=doctor.id,
+            block_date=payload.block_date,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            reason=payload.reason,
+        )
+        self.db.add(block)
+        self.db.commit()
+        self.db.refresh(block)
+        return SlotBlockResponse.model_validate(block)
+
+    def delete_slot_block(
+        self,
+        doctor_id: UUID,
+        block_id: UUID,
+        actor_user_id: UUID,
+        is_website_admin: bool,
+    ) -> None:
+        self._get_owned_or_admin(doctor_id, actor_user_id, is_website_admin)
+        block = (
+            self.db.query(DoctorSlotBlock)
+            .filter(
+                DoctorSlotBlock.id == block_id,
+                DoctorSlotBlock.doctor_id == doctor_id,
+                DoctorSlotBlock.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if not block:
+            raise LookupError("Slot block not found")
+        self.db.delete(block)
         self.db.commit()
 
     def get_slots(self, doctor_id: UUID, target_date: date) -> list[SlotResponse]:
@@ -239,14 +313,19 @@ class DoctorService:
             appointment.slot_time.replace(tzinfo=None)
             for appointment in appointments
         }
+        blocks = self.doctor_repo.get_blocks_for_date(doctor_id, target_date)
         delta = timedelta(minutes=schedule.slot_duration_minutes)
         current = datetime.combine(target_date, schedule.start_time)
         end = datetime.combine(target_date, schedule.end_time)
         slots = []
         while current + delta <= end:
+            block = self._block_for_slot(current, blocks)
             slots.append(
                 SlotResponse(
-                    datetime=current.isoformat(), is_available=current not in taken
+                    datetime=current.isoformat(),
+                    is_available=current not in taken and block is None,
+                    block_id=block.id if block else None,
+                    block_reason=block.reason if block else None,
                 )
             )
             current += delta
@@ -265,3 +344,22 @@ class DoctorService:
         if not is_website_admin and doctor.user_id != actor_user_id:
             raise PermissionError("Access denied")
         return doctor
+
+    def _ensure_block_does_not_cover_existing_appointment(
+        self, doctor_id: UUID, payload: SlotBlockCreate
+    ) -> None:
+        appointments = self.appointment_repo.get_doctor_appointments_for_date(
+            doctor_id, payload.block_date
+        )
+        for appointment in appointments:
+            slot_time = appointment.slot_time.replace(tzinfo=None).time()
+            if payload.start_time <= slot_time < payload.end_time:
+                raise ValueError("Cannot block a time that already has an appointment")
+
+    @staticmethod
+    def _block_for_slot(current: datetime, blocks: list[DoctorSlotBlock]) -> DoctorSlotBlock | None:
+        slot_time = current.time()
+        for block in blocks:
+            if block.start_time <= slot_time < block.end_time:
+                return block
+        return None

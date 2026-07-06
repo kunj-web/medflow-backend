@@ -15,6 +15,8 @@ from app.schemas.doctor import (
     LeaveResponse,
     ScheduleCreate,
     ScheduleResponse,
+    SlotBlockCreate,
+    SlotBlockResponse,
     SlotResponse,
 )
 from app.schemas.pagination import PaginatedResponse, PaginationParams
@@ -222,6 +224,26 @@ def add_leave(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.get(
+    "/{doctor_id}/leaves",
+    response_model=list[LeaveResponse],
+    dependencies=[Depends(require_active_status)],
+)
+def list_leaves(
+    doctor_id: UUID,
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
+    service: DoctorService = Depends(get_service),
+):
+    try:
+        return service.list_leaves(doctor_id, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
 @router.delete(
     "/{doctor_id}/leave/{leave_date}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -237,6 +259,72 @@ def cancel_leave(
 ):
     try:
         service.cancel_leave(doctor_id, leave_date, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@router.get(
+    "/{doctor_id}/slot-blocks",
+    response_model=list[SlotBlockResponse],
+    dependencies=[Depends(require_active_status)],
+)
+def list_slot_blocks(
+    doctor_id: UUID,
+    date: date = Query(..., description="Target date (YYYY-MM-DD)"),
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
+    service: DoctorService = Depends(get_service),
+):
+    try:
+        return service.list_slot_blocks(doctor_id, date, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@router.post(
+    "/{doctor_id}/slot-blocks",
+    response_model=SlotBlockResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_active_status)],
+)
+def add_slot_block(
+    doctor_id: UUID,
+    payload: SlotBlockCreate,
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
+    service: DoctorService = Depends(get_service),
+):
+    try:
+        return service.add_slot_block(doctor_id, payload, *_actor(current_user))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.delete(
+    "/{doctor_id}/slot-blocks/{block_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_active_status)],
+)
+def delete_slot_block(
+    doctor_id: UUID,
+    block_id: UUID,
+    current_user: dict = Depends(
+        require_role(UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
+    ),
+    service: DoctorService = Depends(get_service),
+):
+    try:
+        service.delete_slot_block(doctor_id, block_id, *_actor(current_user))
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PermissionError as exc:

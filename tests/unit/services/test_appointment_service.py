@@ -4,7 +4,9 @@ import pytest
 
 from app.models.enums import AppointmentStatus, AppointmentType, DayOfWeek, UserRole
 from app.schemas.appointment import AppointmentCreate, AppointmentReschedule
+from app.schemas.doctor import LeaveCreate, SlotBlockCreate
 from app.services.appointment_service import AppointmentService
+from app.services.doctor_service import DoctorService
 from tests.factories.doctor_factory import DoctorFactory
 from tests.factories.patient_factory import PatientFactory
 from tests.factories.user_factory import UserFactory
@@ -87,6 +89,50 @@ class TestAppointmentServiceBooking:
                 data=AppointmentCreate(
                     doctor_id=doctor.id,
                     slot_time=slot_at(DayOfWeek.SUNDAY, 10),
+                ),
+                patient_user_id=patient.user_id,
+            )
+
+    def test_booking_on_unavailable_day_raises(self, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+        DoctorService(db).add_leave(
+            doctor.id,
+            LeaveCreate(leave_date=target),
+            actor_user_id=doctor.user_id,
+            is_website_admin=False,
+        )
+
+        with pytest.raises(ValueError, match="unavailable"):
+            AppointmentService(db).book(
+                data=AppointmentCreate(
+                    doctor_id=doctor.id,
+                    slot_time=datetime.combine(target, time(10, 0)),
+                ),
+                patient_user_id=patient.user_id,
+            )
+
+    def test_booking_blocked_slot_raises(self, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+        DoctorService(db).add_slot_block(
+            doctor.id,
+            SlotBlockCreate(
+                block_date=target,
+                start_time=time(10, 0),
+                end_time=time(10, 10),
+            ),
+            actor_user_id=doctor.user_id,
+            is_website_admin=False,
+        )
+
+        with pytest.raises(ValueError, match="unavailable"):
+            AppointmentService(db).book(
+                data=AppointmentCreate(
+                    doctor_id=doctor.id,
+                    slot_time=datetime.combine(target, time(10, 0)),
                 ),
                 patient_user_id=patient.user_id,
             )

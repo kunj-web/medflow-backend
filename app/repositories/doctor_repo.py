@@ -100,3 +100,17 @@ class DoctorRepository(BaseRepository[Doctor]):
             )
             .first()
         )
+
+    def get_blocks_for_date(self, doctor_id: UUID, block_date: date):
+        from app.models.doctor import DoctorSlotBlock
+
+        return (
+            self.db.query(DoctorSlotBlock)
+            .filter(
+                DoctorSlotBlock.doctor_id == doctor_id,
+                DoctorSlotBlock.block_date == block_date,
+                DoctorSlotBlock.deleted_at.is_(None),
+            )
+            .order_by(DoctorSlotBlock.start_time)
+            .all()
+        )
