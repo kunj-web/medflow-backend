@@ -6,7 +6,7 @@ import pytest
 from app.models.doctor import DoctorLeave
 from app.models.enums import AccountStatus, DayOfWeek, UserRole
 from app.repositories.doctor_repo import DoctorRepository
-from app.schemas.doctor import LeaveCreate, ScheduleCreate
+from app.schemas.doctor import LeaveCreate, ScheduleCreate, SlotBlockCreate
 from app.schemas.pagination import PaginationParams
 from app.services.doctor_service import DoctorService
 from tests.factories.doctor_factory import DoctorFactory
@@ -165,6 +165,62 @@ class TestDoctorLeaveAndSlots:
         assert slots[0].datetime.endswith("T09:00:00")
         assert slots[0].is_available is True
 
+    def test_slot_block_marks_matching_slot_unavailable(self, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+        service = DoctorService(db)
+
+        block = service.add_slot_block(
+            doctor.id,
+            SlotBlockCreate(
+                block_date=target,
+                start_time=time(9, 10),
+                end_time=time(9, 20),
+            ),
+            actor_user_id=doctor.user_id,
+            is_website_admin=False,
+        )
+
+        slots = service.get_slots(doctor.id, target)
+        blocked_slot = next(slot for slot in slots if slot.datetime.endswith("T09:10:00"))
+
+        assert blocked_slot.is_available is False
+        assert blocked_slot.block_id == block.id
+
+    def test_slot_block_cannot_cover_existing_appointment(self, db, hospital):
+        from app.schemas.appointment import AppointmentCreate
+        from app.services.appointment_service import AppointmentService
+        from tests.factories.patient_factory import PatientFactory
+
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+        AppointmentService(db).book(
+            AppointmentCreate(
+                doctor_id=doctor.id,
+                slot_time=time_to_datetime(target, time(9, 10)),
+            ),
+            patient.user_id,
+        )
+
+        with pytest.raises(ValueError, match="already has an appointment"):
+            DoctorService(db).add_slot_block(
+                doctor.id,
+                SlotBlockCreate(
+                    block_date=target,
+                    start_time=time(9, 10),
+                    end_time=time(9, 20),
+                ),
+                actor_user_id=doctor.user_id,
+                is_website_admin=False,
+            )
+
 
 def uuid_for_admin():
     return uuid4()
+
+
+def time_to_datetime(target: date, value: time):
+    from datetime import datetime
+
+    return datetime.combine(target, value)

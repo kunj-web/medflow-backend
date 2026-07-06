@@ -1,5 +1,5 @@
 import sqlalchemy as sa
-from sqlalchemy import Boolean, Column, ForeignKey, Index, Numeric, String, Text, Time, Uuid
+from sqlalchemy import Boolean, Column, Date, ForeignKey, Index, Numeric, String, Text, Time, Uuid
 from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel, HospitalScopedMixin
@@ -61,6 +61,7 @@ class Doctor(BaseModel, HospitalScopedMixin):
     hospital = relationship("Hospital", back_populates="doctors", lazy="raise")
     schedules = relationship("DoctorSchedule", back_populates="doctor", lazy="raise")
     leaves = relationship("DoctorLeave", back_populates="doctor", lazy="raise")
+    slot_blocks = relationship("DoctorSlotBlock", back_populates="doctor", lazy="raise")
     appointments = relationship("Appointment", back_populates="doctor", lazy="raise")
 
 
@@ -102,4 +103,23 @@ class DoctorLeave(BaseModel):
 
     # Relationships
     doctor = relationship("Doctor", back_populates="leaves", lazy="raise")
+
+
+class DoctorSlotBlock(BaseModel):
+    __tablename__ = "doctor_slot_blocks"
+    __table_args__ = (
+        Index("ix_slot_block_doctor_date", "doctor_id", "block_date"),
+    )
+
+    doctor_id = Column(
+        Uuid(as_uuid=True),
+        ForeignKey("doctors.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    block_date = Column(Date, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    reason = Column(Text, nullable=True)
+
+    doctor = relationship("Doctor", back_populates="slot_blocks", lazy="raise")
     

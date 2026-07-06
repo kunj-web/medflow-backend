@@ -183,3 +183,53 @@ class TestDoctorSchedule:
         data = response.json()
         assert [item["day_of_week"] for item in data] == ["monday", "sunday"]
         assert data[1]["slot_duration_minutes"] == 5
+
+    async def test_owner_doctor_can_block_and_unblock_slot(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+
+        create = await client.post(
+            f"/api/v1/doctors/{doctor.id}/slot-blocks",
+            json={
+                "block_date": target.isoformat(),
+                "start_time": "09:10",
+                "end_time": "09:20",
+                "reason": "Unavailable",
+            },
+            headers=headers_for(doctor.user_id),
+        )
+
+        assert create.status_code == 201
+        block_id = create.json()["id"]
+
+        slots = await client.get(
+            f"/api/v1/doctors/{doctor.id}/slots?date={target.isoformat()}"
+        )
+        blocked = next(
+            slot for slot in slots.json() if slot["datetime"].endswith("T09:10:00")
+        )
+        assert blocked["is_available"] is False
+        assert blocked["block_id"] == block_id
+
+        delete = await client.delete(
+            f"/api/v1/doctors/{doctor.id}/slot-blocks/{block_id}",
+            headers=headers_for(doctor.user_id),
+        )
+        assert delete.status_code == 204
+
+    async def test_owner_doctor_can_mark_day_unavailable(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+
+        response = await client.post(
+            f"/api/v1/doctors/{doctor.id}/leave",
+            json={"leave_date": target.isoformat(), "reason": "Unavailable"},
+            headers=headers_for(doctor.user_id),
+        )
+
+        assert response.status_code == 201
+        slots = await client.get(
+            f"/api/v1/doctors/{doctor.id}/slots?date={target.isoformat()}"
+        )
+        assert slots.status_code == 200
+        assert slots.json() == []

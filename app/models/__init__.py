@@ -19,6 +19,7 @@ from app.models.doctor import (
     Doctor,
     DoctorLeave,
     DoctorSchedule,
+    DoctorSlotBlock,
 )
 from app.models.enums import (
     AccountStatus,
@@ -78,6 +79,7 @@ __all__ = [
     "Doctor",
     "DoctorLeave",
     "DoctorSchedule",
+    "DoctorSlotBlock",
 
     # Appointment
     "Appointment",

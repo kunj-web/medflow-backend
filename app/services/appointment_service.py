@@ -49,8 +49,10 @@ class AppointmentService:
         self._ensure_slot_matches_schedule(data.slot_time, schedule)
 
         leave = self.doctor_repo.get_leave_for_date(doctor.id, data.slot_time.date())
-        if leave and leave.is_approved:
-            raise ValueError("Doctor is on approved leave on this date")
+        if leave:
+            raise ValueError("Doctor is unavailable on this date")
+        if self._slot_is_blocked(doctor.id, data.slot_time):
+            raise ValueError("This slot is unavailable")
 
         if self.appointment_repo.get_slot_if_taken(doctor.id, data.slot_time):
             raise ValueError("This slot is already booked")
@@ -140,6 +142,8 @@ class AppointmentService:
         )
         if existing and existing.id != appointment_id:
             raise ValueError("New slot is already booked")
+        if self._slot_is_blocked(appointment.doctor_id, data.new_slot_time):
+            raise ValueError("This slot is unavailable")
 
         self.appointment_repo.update(
             appointment,
@@ -195,3 +199,8 @@ class AppointmentService:
             raise ValueError(
                 f"Slot time must align to {schedule.slot_duration_minutes}-minute intervals"
             )
+
+    def _slot_is_blocked(self, doctor_id: UUID, slot_time) -> bool:
+        blocks = self.doctor_repo.get_blocks_for_date(doctor_id, slot_time.date())
+        slot_clock = slot_time.time()
+        return any(block.start_time <= slot_clock < block.end_time for block in blocks)
