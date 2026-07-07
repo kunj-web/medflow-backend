@@ -167,6 +167,36 @@ class TestAuthRoutes:
         assert data["role"] == "patient"
         assert data["status"] == "active"
 
+    async def test_me_returns_patient_profile_name_after_login(self, client):
+        await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "me-patient@test.com",
+                "phone": "9876543220",
+                "password": "Test@1234",
+                "name": "Kunj Patient",
+                "role": "patient",
+            },
+        )
+        login = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "me-patient@test.com",
+                "password": "Test@1234",
+            },
+        )
+
+        response = await client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == "me-patient@test.com"
+        assert data["first_name"] == "Kunj"
+        assert data["last_name"] == "Patient"
+
     async def test_login_pending_doctor_fails(self, client, hospital):
         await client.post(
             "/api/v1/auth/register",

@@ -1,7 +1,13 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import CurrentUser, get_db
+from app.models.doctor import Doctor
+from app.models.enums import UserRole
+from app.models.patient import Patient
+from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
     MeResponse,
@@ -44,5 +50,20 @@ def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=MeResponse)
-def me(current_user: CurrentUser):
-    return current_user
+def me(current_user: CurrentUser, db: Session = Depends(get_db)):
+    user_id = UUID(current_user["user_id"])
+    user = db.query(User).filter(User.id == user_id).first()
+    profile = None
+
+    if current_user.get("role") == UserRole.PATIENT.value:
+        profile = db.query(Patient).filter(Patient.user_id == user_id).first()
+    elif current_user.get("role") == UserRole.DOCTOR.value:
+        profile = db.query(Doctor).filter(Doctor.user_id == user_id).first()
+
+    return {
+        **current_user,
+        "email": user.email if user else None,
+        "phone": user.phone if user else None,
+        "first_name": profile.first_name if profile else None,
+        "last_name": profile.last_name if profile else None,
+    }

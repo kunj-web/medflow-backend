@@ -246,3 +246,7 @@ class MeResponse(BaseModel):
     role: str
     status: str
     is_super_admin: bool = False
+    email: str | None = None
+    phone: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
