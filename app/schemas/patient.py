@@ -23,9 +23,13 @@ class PatientCreate(BaseModel):
     date_of_birth: date
     phone: str
     email: EmailStr | None = None
+    city: str | None = None
+    state: str | None = None
 
     # Medical
     blood_group: BloodGroup | None = None
+    height: float | None = None
+    weight: float | None = None
     allergies: str | None = None
     existing_conditions: str | None = None
     emergency_contact_name: str | None = None
@@ -56,6 +60,13 @@ class PatientCreate(BaseModel):
     def strong_password(cls, v: str) -> str:
         return validate_password_strength(v)
 
+    @field_validator("height", "weight")
+    @classmethod
+    def positive_body_metric(cls, v: float | None) -> float | None:
+        if v is not None and v <= 0:
+            raise ValueError("must be greater than 0")
+        return v
+
     @field_validator("date_of_birth")
     @classmethod
     def not_future(cls, v: date) -> date:
@@ -71,7 +82,11 @@ class PatientUpdate(BaseModel):
     date_of_birth: date | None = None
     phone: str | None = None
     email: EmailStr | None = None
+    city: str | None = None
+    state: str | None = None
     blood_group: BloodGroup | None = None
+    height: float | None = None
+    weight: float | None = None
     allergies: str | None = None
     existing_conditions: str | None = None
     emergency_contact_name: str | None = None
@@ -98,6 +113,13 @@ class PatientUpdate(BaseModel):
             return validate_indian_phone(v)
         return v
 
+    @field_validator("height", "weight")
+    @classmethod
+    def positive_body_metric(cls, v: float | None) -> float | None:
+        if v is not None and v <= 0:
+            raise ValueError("must be greater than 0")
+        return v
+
     @field_validator("date_of_birth")
     @classmethod
     def not_future(cls, v: date | None) -> date | None:
@@ -115,7 +137,11 @@ class PatientResponse(BaseModel):
     date_of_birth: date | None
     phone: str | None
     email: str | None
+    city: str | None
+    state: str | None
     blood_group: BloodGroup | None
+    height: float | None
+    weight: float | None
     allergies: str | None
     existing_conditions: str | None
     emergency_contact_name: str | None
