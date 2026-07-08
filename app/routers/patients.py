@@ -59,6 +59,37 @@ def list_patients(
 
 
 @router.get(
+    "/me",
+    response_model=PatientResponse,
+    dependencies=[Depends(require_active_status)],
+)
+def get_my_patient_profile(
+    current_user: dict = Depends(require_role(UserRole.PATIENT)),
+    service: PatientService = Depends(get_service),
+):
+    profile = service.get_profile_for_user(UUID(current_user["user_id"]))
+    if not profile:
+        raise HTTPException(status_code=404, detail="Patient profile not found")
+    return PatientResponse.model_validate(profile)
+
+
+@router.put(
+    "/me",
+    response_model=PatientResponse,
+    dependencies=[Depends(require_active_status)],
+)
+def update_my_patient_profile(
+    payload: PatientUpdate,
+    current_user: dict = Depends(require_role(UserRole.PATIENT)),
+    service: PatientService = Depends(get_service),
+):
+    profile = service.get_profile_for_user(UUID(current_user["user_id"]))
+    if not profile:
+        raise HTTPException(status_code=404, detail="Patient profile not found")
+    return service.update(profile.id, payload)
+
+
+@router.get(
     "/{patient_id}",
     response_model=PatientWithAppointmentsResponse,
     dependencies=[Depends(require_active_status)],
