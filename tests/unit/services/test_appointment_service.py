@@ -205,6 +205,52 @@ class TestAppointmentServiceMutations:
                 UserRole.PATIENT.value,
             )
 
+    def test_patient_cannot_cancel_on_appointment_day(self, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        service = AppointmentService(db)
+        appointment = service.book(
+            data=AppointmentCreate(
+                doctor_id=doctor.id,
+                slot_time=slot_at(DayOfWeek.MONDAY, 10),
+            ),
+            patient_user_id=patient.user_id,
+        )
+        appointment.slot_time = datetime.combine(date.today(), time(10, 0))
+        db.commit()
+
+        with pytest.raises(ValueError, match="at least one day in advance"):
+            service.cancel(
+                appointment.id,
+                "Same-day cancellation",
+                patient.user_id,
+                UserRole.PATIENT.value,
+            )
+
+    def test_admin_can_cancel_on_appointment_day(self, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        admin = UserFactory.create(db, role=UserRole.WEBSITE_ADMIN)
+        service = AppointmentService(db)
+        appointment = service.book(
+            data=AppointmentCreate(
+                doctor_id=doctor.id,
+                slot_time=slot_at(DayOfWeek.MONDAY, 10),
+            ),
+            patient_user_id=patient.user_id,
+        )
+        appointment.slot_time = datetime.combine(date.today(), time(10, 0))
+        db.commit()
+
+        cancelled = service.cancel(
+            appointment.id,
+            "Administrative cancellation",
+            admin.id,
+            UserRole.WEBSITE_ADMIN.value,
+        )
+
+        assert cancelled.status == AppointmentStatus.CANCELLED
+
     def test_other_patient_cannot_cancel(self, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
         patient = PatientFactory.create(db, hospital.id)
