@@ -98,6 +98,13 @@ class AppointmentService:
             raise ValueError(
                 f"Cannot cancel an appointment that is {appointment.status.value}"
             )
+        if (
+            actor_role == UserRole.PATIENT.value
+            and appointment.slot_time.date() <= date.today()
+        ):
+            raise ValueError(
+                "Appointments can only be cancelled at least one day in advance"
+            )
 
         self.appointment_repo.update(
             appointment,
