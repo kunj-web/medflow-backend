@@ -175,7 +175,7 @@ def cancel_appointment(
     data: AppointmentCancel,
     db: Session = Depends(get_db),
     current_user: dict = Depends(
-        require_role(UserRole.PATIENT, UserRole.WEBSITE_ADMIN)
+        require_role(UserRole.PATIENT, UserRole.DOCTOR, UserRole.WEBSITE_ADMIN)
     ),
 ):
     try:

@@ -214,6 +214,36 @@ class TestAppointmentMutations:
         assert response.status_code == 400
         assert "at least one day in advance" in response.json()["detail"]
 
+    async def test_doctor_can_cancel_own_appointment(self, client, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        appointment_id = (await book(client, doctor, patient)).json()["id"]
+
+        response = await client.post(
+            f"/api/v1/appointments/{appointment_id}/cancel",
+            json={"reason": "Doctor unavailable"},
+            headers=headers_for(doctor.user_id, UserRole.DOCTOR),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "cancelled"
+
+    async def test_other_doctor_cannot_cancel_appointment(
+        self, client, db, hospital
+    ):
+        doctor = DoctorFactory.create(db, hospital.id)
+        other_doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        appointment_id = (await book(client, doctor, patient)).json()["id"]
+
+        response = await client.post(
+            f"/api/v1/appointments/{appointment_id}/cancel",
+            json={"reason": "Wrong doctor"},
+            headers=headers_for(other_doctor.user_id, UserRole.DOCTOR),
+        )
+
+        assert response.status_code == 403
+
     async def test_reschedule_appointment(self, client, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
         patient = PatientFactory.create(db, hospital.id)
