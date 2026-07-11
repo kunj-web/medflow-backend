@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models.appointment import Appointment
+from app.models.doctor import Doctor
 from app.models.enums import AppointmentStatus, DayOfWeek, UserRole
 from app.models.patient import Patient
 from app.repositories.appointment_repo import AppointmentRepository
@@ -172,6 +173,19 @@ class AppointmentService:
             raise LookupError("Appointment not found")
 
         if actor_role == UserRole.WEBSITE_ADMIN.value:
+            return appointment
+        if actor_role == UserRole.DOCTOR.value:
+            owns_appointment = (
+                self.db.query(Doctor.id)
+                .filter(
+                    Doctor.id == appointment.doctor_id,
+                    Doctor.user_id == actor_user_id,
+                    Doctor.deleted_at.is_(None),
+                )
+                .first()
+            )
+            if not owns_appointment:
+                raise PermissionError("Access denied")
             return appointment
         if actor_role != UserRole.PATIENT.value:
             raise PermissionError("Access denied")

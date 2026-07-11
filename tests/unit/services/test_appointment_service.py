@@ -292,8 +292,29 @@ class TestAppointmentServiceMutations:
 
         assert rescheduled.slot_time == slot_at(DayOfWeek.MONDAY, 11)
 
-    def test_doctor_cannot_cancel(self, db, hospital):
+    def test_doctor_can_cancel_own_appointment(self, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        appointment = AppointmentService(db).book(
+            data=AppointmentCreate(
+                doctor_id=doctor.id,
+                slot_time=slot_at(DayOfWeek.MONDAY, 10),
+            ),
+            patient_user_id=patient.user_id,
+        )
+
+        cancelled = AppointmentService(db).cancel(
+            appointment.id,
+            "Doctor unavailable",
+            doctor.user_id,
+            UserRole.DOCTOR.value,
+        )
+
+        assert cancelled.status == AppointmentStatus.CANCELLED
+
+    def test_other_doctor_cannot_cancel(self, db, hospital):
+        doctor = DoctorFactory.create(db, hospital.id)
+        other_doctor = DoctorFactory.create(db, hospital.id)
         patient = PatientFactory.create(db, hospital.id)
         appointment = AppointmentService(db).book(
             data=AppointmentCreate(
@@ -306,7 +327,7 @@ class TestAppointmentServiceMutations:
         with pytest.raises(PermissionError, match="Access denied"):
             AppointmentService(db).cancel(
                 appointment.id,
-                "Doctor cannot cancel",
-                doctor.user_id,
+                "Doctor cannot cancel someone else's appointment",
+                other_doctor.user_id,
                 UserRole.DOCTOR.value,
             )
