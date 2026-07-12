@@ -9,7 +9,7 @@ from app.core.security import decode_token
 from app.db.session import SessionLocal
 from app.models.enums import AccountStatus, UserRole
 
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 # ─── Database ──────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ DBSession = Annotated[Session, Depends(get_db)]
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> dict:
     """
     Returns the authenticated user as a plain dict, decoded from the JWT.
@@ -39,6 +39,13 @@ def get_current_user(
     core/security.create_token_pair for why these are embedded rather
     than looked up fresh).
     """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token = credentials.credentials
     payload = decode_token(token)
 
