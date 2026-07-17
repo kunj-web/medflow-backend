@@ -17,6 +17,15 @@ class AdminUserCreate(BaseModel):
         return validate_password_strength(v)
 
 
+class AdminPasswordReset(BaseModel):
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_must_be_strong(cls, v: str) -> str:
+        return validate_password_strength(v)
+
+
 class AdminUserResponse(BaseModel):
     id: UUID
     email: str
