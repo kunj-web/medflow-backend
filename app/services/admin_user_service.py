@@ -1,10 +1,12 @@
+from uuid import UUID
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.models.enums import AccountStatus, UserRole
 from app.models.user import User
-from app.schemas.admin_user import AdminUserCreate, AdminUserResponse
+from app.schemas.admin_user import AdminPasswordReset, AdminUserCreate, AdminUserResponse
 
 
 class AdminUserService:
@@ -51,6 +53,52 @@ class AdminUserService:
 
         self.db.refresh(user)
         return self._to_response(user)
+
+    def deactivate_admin(self, admin_id: UUID) -> AdminUserResponse:
+        user = self._get_admin_or_404(admin_id)
+        self._ensure_not_super_admin(user, "Super admin cannot be deactivated")
+        user.is_active = False
+        self.db.commit()
+        self.db.refresh(user)
+        return self._to_response(user)
+
+    def reactivate_admin(self, admin_id: UUID) -> AdminUserResponse:
+        user = self._get_admin_or_404(admin_id)
+        self._ensure_not_super_admin(user, "Super admin cannot be reactivated here")
+        user.is_active = True
+        user.status = AccountStatus.ACTIVE
+        self.db.commit()
+        self.db.refresh(user)
+        return self._to_response(user)
+
+    def reset_admin_password(
+        self, admin_id: UUID, data: AdminPasswordReset
+    ) -> AdminUserResponse:
+        user = self._get_admin_or_404(admin_id)
+        self._ensure_not_super_admin(user, "Super admin password cannot be reset here")
+        user.hashed_password = hash_password(data.password)
+        self.db.commit()
+        self.db.refresh(user)
+        return self._to_response(user)
+
+    def _get_admin_or_404(self, admin_id: UUID) -> User:
+        user = (
+            self.db.query(User)
+            .filter(
+                User.id == admin_id,
+                User.role == UserRole.WEBSITE_ADMIN,
+                User.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if not user:
+            raise LookupError("Admin not found")
+        return user
+
+    @staticmethod
+    def _ensure_not_super_admin(user: User, message: str) -> None:
+        if user.is_super_admin:
+            raise ValueError(message)
 
     @staticmethod
     def _to_response(user: User) -> AdminUserResponse:
