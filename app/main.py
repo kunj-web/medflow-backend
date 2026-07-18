@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.routers.admin_review import router as admin_review_router
 from app.routers.admin_users import router as admin_users_router
 from app.routers.appointments import router as appointments_router
+from app.routers.audit_logs import router as audit_logs_router
 
 # Routers — existing
 from app.routers.auth import router as auth_router
@@ -49,6 +50,7 @@ app.include_router(auth_router,          prefix=PREFIX)
 app.include_router(admin_review_router,  prefix=PREFIX)
 app.include_router(admin_users_router,   prefix=PREFIX)
 app.include_router(appointments_router,  prefix=PREFIX)
+app.include_router(audit_logs_router,    prefix=PREFIX)
 app.include_router(config_router,        prefix=PREFIX)
 app.include_router(notifications_router, prefix=PREFIX)
 app.include_router(doctors_router,       prefix=PREFIX)

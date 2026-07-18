@@ -14,6 +14,7 @@ from app.schemas.admin_review import (
     ApprovalHospitalCreate,
     DoctorApproveRequest,
 )
+from app.services.audit_log_service import AuditLogService
 
 
 class AdminReviewService:
@@ -37,7 +38,11 @@ class AdminReviewService:
         return [self._to_response(doctor) for doctor in doctors]
 
     def approve_doctor(
-        self, doctor_id: UUID, payload: DoctorApproveRequest
+        self,
+        doctor_id: UUID,
+        payload: DoctorApproveRequest,
+        actor_user_id: UUID | None = None,
+        actor_role: str | None = None,
     ) -> AdminDoctorReviewResponse:
         doctor = self._get_doctor_or_404(doctor_id)
         user = self._get_user_or_404(doctor.user_id)
@@ -52,6 +57,19 @@ class AdminReviewService:
         user.is_verified = True
         doctor.is_active = True
         self._ensure_default_schedules(doctor)
+        AuditLogService(self.db).record(
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            action="doctor.approved",
+            target_type="doctor",
+            target_id=doctor.id,
+            summary=f"Approved Dr. {doctor.first_name} {doctor.last_name}",
+            details={
+                "doctor_email": user.email,
+                "hospital_id": str(doctor.hospital_id) if doctor.hospital_id else None,
+                "work_type": doctor.work_type.value,
+            },
+        )
 
         self.db.commit()
         self.db.refresh(doctor)

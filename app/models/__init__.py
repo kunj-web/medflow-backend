@@ -14,6 +14,9 @@ Example:
 # Appointment
 from app.models.appointment import Appointment
 
+# Audit
+from app.models.audit_log import AuditLog
+
 # Doctor
 from app.models.doctor import (
     Doctor,
@@ -83,6 +86,9 @@ __all__ = [
 
     # Appointment
     "Appointment",
+
+    # Audit
+    "AuditLog",
 
     # Invoice
     "Invoice",
