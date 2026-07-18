@@ -38,18 +38,21 @@ def list_pending_doctors(
 @router.post(
     "/{doctor_id}/approve",
     response_model=AdminDoctorReviewResponse,
-    dependencies=[
-        Depends(require_active_status),
-        Depends(require_role(UserRole.WEBSITE_ADMIN)),
-    ],
+    dependencies=[Depends(require_active_status)],
 )
 def approve_doctor(
     doctor_id: UUID,
     payload: DoctorApproveRequest,
+    current_user: dict = Depends(require_role(UserRole.WEBSITE_ADMIN)),
     service: AdminReviewService = Depends(get_service),
 ):
     try:
-        return service.approve_doctor(doctor_id, payload)
+        return service.approve_doctor(
+            doctor_id,
+            payload,
+            UUID(current_user["user_id"]),
+            current_user["role"],
+        )
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:

@@ -84,7 +84,11 @@ def create_invoice(
     service: BillingService = Depends(get_service),
 ):
     try:
-        return service.create_invoice(payload)
+        return service.create_invoice(
+            payload,
+            UUID(current_user["user_id"]),
+            current_user["role"],
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -102,7 +106,11 @@ def issue_invoice(
     service: BillingService = Depends(get_service),
 ):
     try:
-        return service.issue_invoice(invoice_id)
+        return service.issue_invoice(
+            invoice_id,
+            UUID(current_user["user_id"]),
+            current_user["role"],
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -139,7 +147,11 @@ def cancel_invoice(
     service: BillingService = Depends(get_service),
 ):
     try:
-        return service.cancel_invoice(invoice_id)
+        return service.cancel_invoice(
+            invoice_id,
+            UUID(current_user["user_id"]),
+            current_user["role"],
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

@@ -27,11 +27,18 @@ def list_admins(db: Session = Depends(get_db)):
     "",
     response_model=AdminUserResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_super_admin)],
 )
-def create_admin(data: AdminUserCreate, db: Session = Depends(get_db)):
+def create_admin(
+    data: AdminUserCreate,
+    current_user: dict = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
     try:
-        return AdminUserService(db).create_admin(data)
+        return AdminUserService(db).create_admin(
+            data,
+            UUID(current_user["user_id"]),
+            current_user["role"],
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -39,11 +46,18 @@ def create_admin(data: AdminUserCreate, db: Session = Depends(get_db)):
 @router.post(
     "/{admin_id}/deactivate",
     response_model=AdminUserResponse,
-    dependencies=[Depends(require_super_admin)],
 )
-def deactivate_admin(admin_id: UUID, db: Session = Depends(get_db)):
+def deactivate_admin(
+    admin_id: UUID,
+    current_user: dict = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
     try:
-        return AdminUserService(db).deactivate_admin(admin_id)
+        return AdminUserService(db).deactivate_admin(
+            admin_id,
+            UUID(current_user["user_id"]),
+            current_user["role"],
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -53,11 +67,18 @@ def deactivate_admin(admin_id: UUID, db: Session = Depends(get_db)):
 @router.post(
     "/{admin_id}/reactivate",
     response_model=AdminUserResponse,
-    dependencies=[Depends(require_super_admin)],
 )
-def reactivate_admin(admin_id: UUID, db: Session = Depends(get_db)):
+def reactivate_admin(
+    admin_id: UUID,
+    current_user: dict = Depends(require_super_admin),
+    db: Session = Depends(get_db),
+):
     try:
-        return AdminUserService(db).reactivate_admin(admin_id)
+        return AdminUserService(db).reactivate_admin(
+            admin_id,
+            UUID(current_user["user_id"]),
+            current_user["role"],
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -67,15 +88,20 @@ def reactivate_admin(admin_id: UUID, db: Session = Depends(get_db)):
 @router.post(
     "/{admin_id}/reset-password",
     response_model=AdminUserResponse,
-    dependencies=[Depends(require_super_admin)],
 )
 def reset_admin_password(
     admin_id: UUID,
     data: AdminPasswordReset,
+    current_user: dict = Depends(require_super_admin),
     db: Session = Depends(get_db),
 ):
     try:
-        return AdminUserService(db).reset_admin_password(admin_id, data)
+        return AdminUserService(db).reset_admin_password(
+            admin_id,
+            data,
+            UUID(current_user["user_id"]),
+            current_user["role"],
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

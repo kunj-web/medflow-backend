@@ -13,13 +13,19 @@ from app.models.invoice import Invoice
 from app.models.patient import Patient
 from app.schemas.invoice import InvoiceCreate, InvoiceResponse, PaymentRequest
 from app.schemas.pagination import PaginatedResponse, PaginationParams
+from app.services.audit_log_service import AuditLogService
 
 
 class BillingService:
     def __init__(self, db: Session) -> None:
         self.db = db
 
-    def create_invoice(self, payload: InvoiceCreate) -> InvoiceResponse:
+    def create_invoice(
+        self,
+        payload: InvoiceCreate,
+        actor_user_id: UUID | None = None,
+        actor_role: str | None = None,
+    ) -> InvoiceResponse:
         appointment = self._get_appointment_or_404(payload.appointment_id)
         if appointment.status == AppointmentStatus.CANCELLED:
             raise ValueError("Cannot invoice a cancelled appointment")
@@ -51,16 +57,48 @@ class BillingService:
             notes=payload.notes,
         )
         self.db.add(invoice)
+        self.db.flush()
+        AuditLogService(self.db).record(
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            action="invoice.created",
+            target_type="invoice",
+            target_id=invoice.id,
+            summary=f"Created invoice {invoice.invoice_number}",
+            details={
+                "appointment_id": str(invoice.appointment_id),
+                "patient_id": str(invoice.patient_id),
+                "total_amount": float(invoice.total_amount),
+            },
+        )
         self.db.commit()
         self.db.refresh(invoice)
         return self._to_response(invoice)
 
-    def issue_invoice(self, invoice_id: UUID) -> InvoiceResponse:
+    def issue_invoice(
+        self,
+        invoice_id: UUID,
+        actor_user_id: UUID | None = None,
+        actor_role: str | None = None,
+    ) -> InvoiceResponse:
         invoice = self._get_or_404(invoice_id)
         if invoice.status != InvoiceStatus.DRAFT:
             raise ValueError(f"Invoice is already {invoice.status.value}")
         invoice.status = InvoiceStatus.ISSUED
         invoice.issued_at = datetime.now(UTC)
+        AuditLogService(self.db).record(
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            action="invoice.issued",
+            target_type="invoice",
+            target_id=invoice.id,
+            summary=f"Issued invoice {invoice.invoice_number}",
+            details={
+                "appointment_id": str(invoice.appointment_id),
+                "patient_id": str(invoice.patient_id),
+                "total_amount": float(invoice.total_amount),
+            },
+        )
         self.db.commit()
         self.db.refresh(invoice)
         return self._to_response(invoice)
@@ -99,11 +137,29 @@ class BillingService:
         self.db.refresh(invoice)
         return self._to_response(invoice)
 
-    def cancel_invoice(self, invoice_id: UUID) -> InvoiceResponse:
+    def cancel_invoice(
+        self,
+        invoice_id: UUID,
+        actor_user_id: UUID | None = None,
+        actor_role: str | None = None,
+    ) -> InvoiceResponse:
         invoice = self._get_or_404(invoice_id)
         if invoice.status == InvoiceStatus.PAID:
             raise ValueError("Cannot cancel a fully paid invoice")
         invoice.status = InvoiceStatus.CANCELLED
+        AuditLogService(self.db).record(
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            action="invoice.cancelled",
+            target_type="invoice",
+            target_id=invoice.id,
+            summary=f"Cancelled invoice {invoice.invoice_number}",
+            details={
+                "appointment_id": str(invoice.appointment_id),
+                "patient_id": str(invoice.patient_id),
+                "total_amount": float(invoice.total_amount),
+            },
+        )
         self.db.commit()
         self.db.refresh(invoice)
         return self._to_response(invoice)

@@ -10,6 +10,7 @@ from app.models.patient import Patient
 from app.repositories.appointment_repo import AppointmentRepository
 from app.repositories.doctor_repo import DoctorRepository
 from app.schemas.appointment import AppointmentCreate, AppointmentReschedule
+from app.services.audit_log_service import AuditLogService
 from app.services.notification_service import notification_service
 
 
@@ -112,6 +113,20 @@ class AppointmentService:
             {
                 "status": AppointmentStatus.CANCELLED,
                 "cancellation_reason": reason,
+            },
+        )
+        AuditLogService(self.db).record(
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            action="appointment.cancelled",
+            target_type="appointment",
+            target_id=appointment.id,
+            summary=f"Cancelled appointment token #{appointment.token_number}",
+            details={
+                "reason": reason,
+                "doctor_id": str(appointment.doctor_id),
+                "patient_id": str(appointment.patient_id),
+                "slot_time": appointment.slot_time.isoformat(),
             },
         )
         self.db.commit()

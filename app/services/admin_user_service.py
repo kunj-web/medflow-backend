@@ -7,6 +7,7 @@ from app.core.security import hash_password
 from app.models.enums import AccountStatus, UserRole
 from app.models.user import User
 from app.schemas.admin_user import AdminPasswordReset, AdminUserCreate, AdminUserResponse
+from app.services.audit_log_service import AuditLogService
 
 
 class AdminUserService:
@@ -25,7 +26,12 @@ class AdminUserService:
         )
         return [self._to_response(user) for user in users]
 
-    def create_admin(self, data: AdminUserCreate) -> AdminUserResponse:
+    def create_admin(
+        self,
+        data: AdminUserCreate,
+        actor_user_id: UUID | None = None,
+        actor_role: str | None = None,
+    ) -> AdminUserResponse:
         existing = (
             self.db.query(User)
             .filter(User.email == str(data.email), User.deleted_at.is_(None))
@@ -46,6 +52,16 @@ class AdminUserService:
         )
         self.db.add(user)
         try:
+            self.db.flush()
+            AuditLogService(self.db).record(
+                actor_user_id=actor_user_id,
+                actor_role=actor_role,
+                action="admin.created",
+                target_type="admin",
+                target_id=user.id,
+                summary=f"Created admin account {user.email}",
+                details={"admin_email": user.email},
+            )
             self.db.commit()
         except IntegrityError as exc:
             self.db.rollback()
@@ -54,29 +70,70 @@ class AdminUserService:
         self.db.refresh(user)
         return self._to_response(user)
 
-    def deactivate_admin(self, admin_id: UUID) -> AdminUserResponse:
+    def deactivate_admin(
+        self,
+        admin_id: UUID,
+        actor_user_id: UUID | None = None,
+        actor_role: str | None = None,
+    ) -> AdminUserResponse:
         user = self._get_admin_or_404(admin_id)
         self._ensure_not_super_admin(user, "Super admin cannot be deactivated")
         user.is_active = False
+        AuditLogService(self.db).record(
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            action="admin.deactivated",
+            target_type="admin",
+            target_id=user.id,
+            summary=f"Deactivated admin account {user.email}",
+            details={"admin_email": user.email},
+        )
         self.db.commit()
         self.db.refresh(user)
         return self._to_response(user)
 
-    def reactivate_admin(self, admin_id: UUID) -> AdminUserResponse:
+    def reactivate_admin(
+        self,
+        admin_id: UUID,
+        actor_user_id: UUID | None = None,
+        actor_role: str | None = None,
+    ) -> AdminUserResponse:
         user = self._get_admin_or_404(admin_id)
         self._ensure_not_super_admin(user, "Super admin cannot be reactivated here")
         user.is_active = True
         user.status = AccountStatus.ACTIVE
+        AuditLogService(self.db).record(
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            action="admin.reactivated",
+            target_type="admin",
+            target_id=user.id,
+            summary=f"Reactivated admin account {user.email}",
+            details={"admin_email": user.email},
+        )
         self.db.commit()
         self.db.refresh(user)
         return self._to_response(user)
 
     def reset_admin_password(
-        self, admin_id: UUID, data: AdminPasswordReset
+        self,
+        admin_id: UUID,
+        data: AdminPasswordReset,
+        actor_user_id: UUID | None = None,
+        actor_role: str | None = None,
     ) -> AdminUserResponse:
         user = self._get_admin_or_404(admin_id)
         self._ensure_not_super_admin(user, "Super admin password cannot be reset here")
         user.hashed_password = hash_password(data.password)
+        AuditLogService(self.db).record(
+            actor_user_id=actor_user_id,
+            actor_role=actor_role,
+            action="admin.password_reset",
+            target_type="admin",
+            target_id=user.id,
+            summary=f"Reset password for admin account {user.email}",
+            details={"admin_email": user.email},
+        )
         self.db.commit()
         self.db.refresh(user)
         return self._to_response(user)
