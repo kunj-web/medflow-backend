@@ -10,6 +10,7 @@ from app.models.hospital import Hospital
 from app.models.patient import Patient
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest
+from app.services.notification_service import notification_service
 
 
 class AuthService:
@@ -82,6 +83,8 @@ class AuthService:
                 "account with this email, contact support."
             )
 
+        doctor_review_notification: tuple[str, str] | None = None
+
         if data.role == UserRole.PATIENT:
             name_parts = data.name.strip().split(" ", 1)
             first_name = name_parts[0]
@@ -132,8 +135,18 @@ class AuthService:
             doctor = Doctor(**doctor_kwargs)
             self.db.add(doctor)
             self.db.flush()
+            doctor_review_notification = (
+                f"Dr. {doctor.first_name} {doctor.last_name}".strip(),
+                user.email,
+            )
 
         self.db.commit()
+        if doctor_review_notification is not None:
+            notification_service.notify_pending_doctor_review(
+                doctor_review_notification[0],
+                doctor_review_notification[1],
+                self.db,
+            )
 
         message = (
             "Registration successful. You can now log in."

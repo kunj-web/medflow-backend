@@ -81,7 +81,7 @@ class AppointmentService:
 
         appointment = self.appointment_repo.get_by_id_with_relations(appointment.id)
         notification_service.notify_appointment_booked(appointment, self.db)
-        return appointment
+        return self.appointment_repo.get_by_id_with_relations(appointment.id)
 
     def cancel(
         self,
@@ -132,7 +132,7 @@ class AppointmentService:
         self.db.commit()
         appointment = self.appointment_repo.get_by_id_with_relations(appointment_id)
         notification_service.notify_appointment_cancelled(appointment, self.db)
-        return appointment
+        return self.appointment_repo.get_by_id_with_relations(appointment_id)
 
     def reschedule(
         self,

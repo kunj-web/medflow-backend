@@ -24,8 +24,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.appointment import Appointment
-from app.models.enums import NotificationType
+from app.models.enums import NotificationType, UserRole
 from app.models.notification import Notification
+from app.models.user import User
 from app.repositories.notification_repo import NotificationRepository
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,15 @@ class NotificationService:
             return
 
         user_uuid = _coerce_uuid(user_id)
+        self._persist_notification(
+            db=db,
+            user_id=user_uuid,
+            notification_type=_notification_type_from_data(data),
+            title=title,
+            body=body,
+            data=data,
+        )
+
         notification_repo = NotificationRepository(db)
         devices = notification_repo.get_user_devices(user_uuid)
 
@@ -120,16 +130,6 @@ class NotificationService:
         if messaging is None:
             logger.warning("firebase-admin is not installed. Push notification skipped.")
             return
-
-        # Persist notification record
-        self._persist_notification(
-            db=db,
-            user_id=user_uuid,
-            notification_type=_notification_type_from_data(data),
-            title=title,
-            body=body,
-            data=data,
-        )
 
         # Send via FCM multicast
         message = messaging.MulticastMessage(
@@ -244,6 +244,7 @@ class NotificationService:
                 str(appointment.hospital_id) if appointment.hospital_id else None
             ),
         )
+        db.commit()
 
     def notify_appointment_cancelled(self, appointment: Appointment, db: Session) -> None:
         """
@@ -295,6 +296,38 @@ class NotificationService:
                 str(appointment.hospital_id) if appointment.hospital_id else None
             ),
         )
+        db.commit()
+
+    def notify_pending_doctor_review(
+        self,
+        doctor_name: str,
+        doctor_email: str,
+        db: Session,
+    ) -> None:
+        admins = (
+            db.query(User)
+            .filter(
+                User.role == UserRole.WEBSITE_ADMIN,
+                User.is_active == True,
+                User.deleted_at.is_(None),
+            )
+            .all()
+        )
+
+        for admin in admins:
+            self.send_push(
+                user_id=admin.id,
+                title="Doctor review pending",
+                body=f"{doctor_name} signed up as a doctor and needs review.",
+                data={
+                    "type": "general",
+                    "event": "pending_doctor_review",
+                    "doctor_email": doctor_email,
+                    "href": "/admin-review",
+                },
+                db=db,
+            )
+        db.commit()
 
     def notify_appointment_reminder(self, appointment: Appointment, db: Session, hours_before: int) -> None:
         """
@@ -347,6 +380,7 @@ class NotificationService:
                     hours_before=hours_before,
                 ),
             )
+        db.commit()
 
     # -----------------------------------------------------------------------
     # Internal
