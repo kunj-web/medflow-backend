@@ -19,6 +19,7 @@ from app.routers.invoices import router as invoices_router
 from app.routers.notifications import router as notifications_router
 from app.routers.patients import router as patients_router
 from app.routers.public import router as public_router
+from app.routers.search import router as search_router
 
 app = FastAPI(
     title="MedFlow API",
@@ -57,6 +58,7 @@ app.include_router(doctors_router,       prefix=PREFIX)
 app.include_router(patients_router,      prefix=PREFIX)
 app.include_router(invoices_router,      prefix=PREFIX)
 app.include_router(public_router,        prefix=PREFIX)
+app.include_router(search_router,        prefix=PREFIX)
 
 
 # ---------------------------------------------------------------------------
