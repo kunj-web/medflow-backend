@@ -39,11 +39,28 @@ class NotificationRepository(BaseRepository[Notification]):
             .filter(
                 Notification.user_id == user_id,
                 Notification.is_read == False,
+                Notification.deleted_at.is_(None),
             )
             .update({"is_read": True})
         )
         self.db.flush()
         return updated
+
+    def mark_read(self, user_id: UUID, notification_id: UUID) -> Notification | None:
+        notification = (
+            self.db.query(Notification)
+            .filter(
+                Notification.id == notification_id,
+                Notification.user_id == user_id,
+                Notification.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if not notification:
+            return None
+        notification.is_read = True
+        self.db.flush()
+        return notification
 
     def get_user_devices(self, user_id: UUID) -> list[UserDevice]:
         return (

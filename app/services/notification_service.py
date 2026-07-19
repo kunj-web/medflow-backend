@@ -209,7 +209,12 @@ class NotificationService:
             body=f"Your appointment with Dr. {doctor.last_name} is confirmed for {slot}.",
             data={
                 "type": "appointment_booked",
+                "category": "appointments",
                 "appointment_id": str(appointment.id),
+                "doctor_name": f"Dr. {doctor.first_name} {doctor.last_name}",
+                "slot_time": appointment.slot_time.isoformat(),
+                "token_number": str(appointment.token_number or ""),
+                "href": f"/appointments#{appointment.id}",
             },
             db=db,
             hospital_id=(
@@ -237,7 +242,12 @@ class NotificationService:
             body=f"New appointment booked: {patient.first_name} {patient.last_name} at {slot}.",
             data={
                 "type": "appointment_booked",
+                "category": "appointments",
                 "appointment_id": str(appointment.id),
+                "patient_name": f"{patient.first_name} {patient.last_name}",
+                "slot_time": appointment.slot_time.isoformat(),
+                "token_number": str(appointment.token_number or ""),
+                "href": f"/appointments#{appointment.id}",
             },
             db=db,
             hospital_id=(
@@ -262,7 +272,12 @@ class NotificationService:
             body=f"Your appointment with Dr. {doctor.last_name} on {slot} has been cancelled.",
             data={
                 "type": "appointment_cancelled",
+                "category": "appointments",
                 "appointment_id": str(appointment.id),
+                "doctor_name": f"Dr. {doctor.first_name} {doctor.last_name}",
+                "slot_time": appointment.slot_time.isoformat(),
+                "reason": appointment.cancellation_reason or "",
+                "href": f"/appointments#{appointment.id}",
             },
             db=db,
             hospital_id=(
@@ -289,7 +304,12 @@ class NotificationService:
             body=f"Appointment with {patient.first_name} {patient.last_name} at {slot} was cancelled.",
             data={
                 "type": "appointment_cancelled",
+                "category": "appointments",
                 "appointment_id": str(appointment.id),
+                "patient_name": f"{patient.first_name} {patient.last_name}",
+                "slot_time": appointment.slot_time.isoformat(),
+                "reason": appointment.cancellation_reason or "",
+                "href": f"/appointments#{appointment.id}",
             },
             db=db,
             hospital_id=(
@@ -321,6 +341,7 @@ class NotificationService:
                 body=f"{doctor_name} signed up as a doctor and needs review.",
                 data={
                     "type": "general",
+                    "category": "admin",
                     "event": "pending_doctor_review",
                     "doctor_email": doctor_email,
                     "href": "/admin-review",
@@ -359,8 +380,11 @@ class NotificationService:
             body=push_body,
             data={
                 "type": "appointment_reminder",
+                "category": "appointments",
                 "appointment_id": str(appointment.id),
                 "hours_before": str(hours_before),
+                "slot_time": appointment.slot_time.isoformat(),
+                "href": f"/appointments#{appointment.id}",
             },
             db=db,
             hospital_id=(

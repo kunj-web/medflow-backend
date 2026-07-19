@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import CurrentUser, get_db
@@ -35,6 +36,20 @@ def mark_all_read(
     count = repo.mark_all_read(UUID(current_user["user_id"]))
     db.commit()
     return {"marked_read": count}
+
+
+@router.post("/{notification_id}/read")
+def mark_notification_read(
+    notification_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = None,
+):
+    repo = NotificationRepository(db)
+    notification = repo.mark_read(UUID(current_user["user_id"]), notification_id)
+    if notification is None:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    db.commit()
+    return {"marked_read": True}
 
 
 @router.post("/device/register")

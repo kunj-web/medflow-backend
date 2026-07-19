@@ -14,6 +14,7 @@ from app.models.patient import Patient
 from app.schemas.invoice import InvoiceCreate, InvoiceResponse, PaymentRequest
 from app.schemas.pagination import PaginatedResponse, PaginationParams
 from app.services.audit_log_service import AuditLogService
+from app.services.notification_service import notification_service
 
 
 class BillingService:
@@ -71,6 +72,22 @@ class BillingService:
                 "total_amount": float(invoice.total_amount),
             },
         )
+        patient = self.db.query(Patient).filter(Patient.id == invoice.patient_id).first()
+        if patient:
+            notification_service.send_push(
+                user_id=patient.user_id,
+                title="Invoice issued",
+                body=f"Invoice {invoice.invoice_number} has been issued for {invoice.total_amount}.",
+                data={
+                    "type": "invoice_generated",
+                    "category": "billing",
+                    "invoice_id": str(invoice.id),
+                    "invoice_number": invoice.invoice_number,
+                    "total_amount": str(invoice.total_amount),
+                    "href": f"/invoices#{invoice.id}",
+                },
+                db=self.db,
+            )
         self.db.commit()
         self.db.refresh(invoice)
         return self._to_response(invoice)
