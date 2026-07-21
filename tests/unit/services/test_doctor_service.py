@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 
 from app.models.doctor import DoctorLeave
-from app.models.enums import AccountStatus, DayOfWeek, UserRole
+from app.models.enums import AccountStatus, AppointmentStatus, DayOfWeek, UserRole
 from app.repositories.doctor_repo import DoctorRepository
 from app.schemas.doctor import LeaveCreate, ScheduleCreate, SlotBlockCreate
 from app.schemas.pagination import PaginationParams
@@ -154,6 +154,67 @@ class TestDoctorLeaveAndSlots:
         slots = DoctorService(db).get_slots(doctor.id, target)
 
         assert slots == []
+
+    def test_add_leave_requires_confirmation_when_appointments_exist(self, db, hospital):
+        from app.schemas.appointment import AppointmentCreate
+        from app.services.appointment_service import AppointmentService
+        from tests.factories.patient_factory import PatientFactory
+
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+        AppointmentService(db).book(
+            AppointmentCreate(
+                doctor_id=doctor.id,
+                slot_time=time_to_datetime(target, time(9, 10)),
+            ),
+            patient.user_id,
+        )
+
+        with pytest.raises(ValueError, match="Confirm cancellation"):
+            DoctorService(db).add_leave(
+                doctor.id,
+                LeaveCreate(leave_date=target, reason="Clinic closed"),
+                actor_user_id=doctor.user_id,
+                is_website_admin=False,
+            )
+
+    def test_add_leave_can_cancel_existing_appointments(self, db, hospital):
+        from app.repositories.appointment_repo import AppointmentRepository
+        from app.schemas.appointment import AppointmentCreate
+        from app.services.appointment_service import AppointmentService
+        from tests.factories.patient_factory import PatientFactory
+
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+        booked = AppointmentService(db).book(
+            AppointmentCreate(
+                doctor_id=doctor.id,
+                slot_time=time_to_datetime(target, time(9, 10)),
+            ),
+            patient.user_id,
+        )
+
+        leave = DoctorService(db).add_leave(
+            doctor.id,
+            LeaveCreate(
+                leave_date=target,
+                reason="Clinic closed",
+                cancel_existing_appointments=True,
+                cancellation_reason="Doctor unavailable due to clinic closure",
+            ),
+            actor_user_id=doctor.user_id,
+            is_website_admin=False,
+        )
+
+        appointment = AppointmentRepository(db).get_by_id_with_relations(booked.id)
+        assert leave.leave_date == target
+        assert appointment.status == AppointmentStatus.CANCELLED
+        assert (
+            appointment.cancellation_reason
+            == "Doctor unavailable due to clinic closure"
+        )
 
     def test_get_slots_uses_schedule_duration(self, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
