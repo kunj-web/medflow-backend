@@ -67,6 +67,8 @@ class TestAdminDoctorReview:
         assert data[0]["status"] == "pending"
         assert data[0]["work_type"] == "hospital"
         assert data[0]["hospital_id"] == str(hospital.id)
+        assert len(data[0]["schedules"]) == 7
+        assert data[0]["schedules"][0]["day_of_week"] == "monday"
 
     async def test_approve_existing_hospital_doctor_allows_login(
         self, client, db, hospital, admin_headers

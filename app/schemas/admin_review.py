@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 from app.models.enums import AccountStatus, Gender, WorkType
+from app.schemas.doctor import ScheduleResponse
 from app.schemas.validators.common import validate_non_empty_string
 from app.schemas.validators.phone import validate_indian_phone
 
@@ -78,4 +79,5 @@ class AdminDoctorReviewResponse(BaseModel):
     pending_hospital_name: str | None
     pending_hospital_city: str | None
     pending_hospital_state: str | None
+    schedules: list[ScheduleResponse] = []
     created_at: datetime

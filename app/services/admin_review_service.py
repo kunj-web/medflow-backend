@@ -14,6 +14,7 @@ from app.schemas.admin_review import (
     ApprovalHospitalCreate,
     DoctorApproveRequest,
 )
+from app.schemas.doctor import ScheduleResponse
 from app.services.audit_log_service import AuditLogService
 
 
@@ -24,7 +25,7 @@ class AdminReviewService:
     def list_pending_doctors(self) -> list[AdminDoctorReviewResponse]:
         doctors = (
             self.db.query(Doctor)
-            .options(joinedload(Doctor.user))
+            .options(joinedload(Doctor.user), joinedload(Doctor.schedules))
             .join(User, Doctor.user_id == User.id)
             .filter(
                 User.role == UserRole.DOCTOR,
@@ -149,7 +150,7 @@ class AdminReviewService:
     def _get_doctor_or_404(self, doctor_id: UUID) -> Doctor:
         doctor = (
             self.db.query(Doctor)
-            .options(joinedload(Doctor.user))
+            .options(joinedload(Doctor.user), joinedload(Doctor.schedules))
             .filter(Doctor.id == doctor_id, Doctor.deleted_at.is_(None))
             .first()
         )
@@ -213,5 +214,16 @@ class AdminReviewService:
             pending_hospital_name=doctor.pending_hospital_name,
             pending_hospital_city=doctor.pending_hospital_city,
             pending_hospital_state=doctor.pending_hospital_state,
+            schedules=[
+                ScheduleResponse.model_validate(schedule)
+                for schedule in sorted(
+                    [
+                        schedule
+                        for schedule in doctor.schedules
+                        if schedule.deleted_at is None
+                    ],
+                    key=lambda schedule: list(DayOfWeek).index(schedule.day_of_week),
+                )
+            ],
             created_at=doctor.created_at,
         )
