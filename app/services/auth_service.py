@@ -1,11 +1,12 @@
+from datetime import time
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import create_token_pair, decode_token, hash_password, verify_password
-from app.models.doctor import Doctor
-from app.models.enums import AccountStatus, UserRole, WorkType
+from app.models.doctor import Doctor, DoctorSchedule
+from app.models.enums import AccountStatus, DayOfWeek, UserRole, WorkType
 from app.models.hospital import Hospital
 from app.models.patient import Patient
 from app.models.user import User
@@ -135,6 +136,7 @@ class AuthService:
             doctor = Doctor(**doctor_kwargs)
             self.db.add(doctor)
             self.db.flush()
+            self._create_registration_schedules(doctor, data)
             doctor_review_notification = (
                 f"Dr. {doctor.first_name} {doctor.last_name}".strip(),
                 user.email,
@@ -161,6 +163,37 @@ class AuthService:
             "status": user.status.value,
             "message": message,
         }
+
+    def _create_registration_schedules(
+        self, doctor: Doctor, data: RegisterRequest
+    ) -> None:
+        schedules = data.weekly_schedule or [
+            DoctorSchedule(
+                doctor_id=doctor.id,
+                day_of_week=day,
+                start_time=time(9, 0),
+                end_time=time(17, 0),
+                slot_duration_minutes=10,
+                is_active=True,
+            )
+            for day in DayOfWeek
+        ]
+
+        for schedule in schedules:
+            if isinstance(schedule, DoctorSchedule):
+                self.db.add(schedule)
+                continue
+
+            self.db.add(
+                DoctorSchedule(
+                    doctor_id=doctor.id,
+                    day_of_week=schedule.day_of_week,
+                    start_time=schedule.start_time,
+                    end_time=schedule.end_time,
+                    slot_duration_minutes=schedule.slot_duration_minutes,
+                    is_active=True,
+                )
+            )
 
     def login(self, data: LoginRequest) -> dict:
         user = self.db.query(User).filter(

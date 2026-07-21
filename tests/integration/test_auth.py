@@ -1,4 +1,4 @@
-from app.models.doctor import Doctor
+from app.models.doctor import Doctor, DoctorSchedule
 from app.models.enums import AccountStatus, UserRole, WorkType
 from app.models.user import User
 
@@ -88,6 +88,59 @@ class TestAuthRoutes:
         assert user.role == UserRole.DOCTOR
         assert doctor.work_type == WorkType.HOSPITAL
         assert doctor.hospital_id == hospital.id
+        schedules = db.query(DoctorSchedule).filter(
+            DoctorSchedule.doctor_id == doctor.id
+        ).all()
+        assert len(schedules) == 7
+        assert {schedule.slot_duration_minutes for schedule in schedules} == {10}
+
+    async def test_register_doctor_accepts_custom_weekly_schedule(
+        self, client, db, hospital
+    ):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "schedule-doctor@test.com",
+                "phone": "9876543221",
+                "password": "Test@1234",
+                "name": "Schedule Doctor",
+                "role": "doctor",
+                "specialization": "Orthopedics",
+                "qualification": "MS",
+                "registration_number": "REG-456",
+                "experience_years": 5,
+                "work_type": "hospital",
+                "gender": "female",
+                "hospital_id": str(hospital.id),
+                "weekly_schedule": [
+                    {
+                        "day_of_week": "monday",
+                        "start_time": "08:00",
+                        "end_time": "12:00",
+                        "slot_duration_minutes": 5,
+                    },
+                    {
+                        "day_of_week": "wednesday",
+                        "start_time": "13:00",
+                        "end_time": "18:00",
+                        "slot_duration_minutes": 15,
+                    },
+                ],
+            },
+        )
+
+        assert response.status_code == 201
+        user = db.query(User).filter(User.email == "schedule-doctor@test.com").one()
+        doctor = db.query(Doctor).filter(Doctor.user_id == user.id).one()
+        schedules = db.query(DoctorSchedule).filter(
+            DoctorSchedule.doctor_id == doctor.id
+        ).all()
+        assert len(schedules) == 2
+        assert {schedule.day_of_week.value for schedule in schedules} == {
+            "monday",
+            "wednesday",
+        }
+        assert {schedule.slot_duration_minutes for schedule in schedules} == {5, 15}
 
     async def test_register_doctor_with_manual_hospital_is_pending(self, client, db):
         response = await client.post(

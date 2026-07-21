@@ -2,7 +2,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
-from app.models.enums import Gender, UserRole, WorkType
+from app.models.enums import DayOfWeek, Gender, UserRole, WorkType
+from app.schemas.doctor import ScheduleCreate
 from app.schemas.validators import (
     validate_indian_phone,
     validate_non_empty_string,
@@ -39,6 +40,10 @@ class RegisterRequest(BaseModel):
     clinic_name: str | None = None
     clinic_city: str | None = None
     clinic_address: str | None = None
+
+    # Doctor weekly availability. Optional on registration; omitted means
+    # default Monday-Sunday 09:00-17:00 with 10-minute slots.
+    weekly_schedule: list[ScheduleCreate] | None = None
 
     @field_validator("phone")
     @classmethod
@@ -103,6 +108,7 @@ class RegisterRequest(BaseModel):
             "clinic_name": self.clinic_name,
             "clinic_city": self.clinic_city,
             "clinic_address": self.clinic_address,
+            "weekly_schedule": self.weekly_schedule,
         }
 
         if self.role != UserRole.DOCTOR:
@@ -177,6 +183,29 @@ class RegisterRequest(BaseModel):
                     "hospital_id and pending_hospital_* fields are not applicable "
                     "when work_type is 'clinic'"
                 )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_weekly_schedule(self):
+        if self.weekly_schedule is None:
+            return self
+
+        if len(self.weekly_schedule) == 0:
+            raise ValueError("weekly_schedule must include at least one active day")
+
+        seen_days: set[DayOfWeek] = set()
+        duplicate_days: list[str] = []
+        for schedule in self.weekly_schedule:
+            if schedule.day_of_week in seen_days:
+                duplicate_days.append(schedule.day_of_week.value)
+            seen_days.add(schedule.day_of_week)
+
+        if duplicate_days:
+            raise ValueError(
+                "weekly_schedule cannot contain duplicate days: "
+                f"{', '.join(sorted(set(duplicate_days)))}"
+            )
 
         return self
 

@@ -108,6 +108,53 @@ class TestAdminDoctorReview:
         assert login.status_code == 200
         assert login.json()["role"] == "doctor"
 
+    async def test_approve_doctor_preserves_registration_schedule(
+        self, client, db, hospital, admin_headers
+    ):
+        response = await client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "approve-custom-schedule@test.com",
+                "phone": "9876500003",
+                "password": "Test@1234",
+                "name": "Custom Schedule",
+                "role": "doctor",
+                "specialization": "Neurology",
+                "work_type": "hospital",
+                "gender": "male",
+                "hospital_id": str(hospital.id),
+                "weekly_schedule": [
+                    {
+                        "day_of_week": "tuesday",
+                        "start_time": "10:00",
+                        "end_time": "14:00",
+                        "slot_duration_minutes": 20,
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 201
+        doctor = (
+            db.query(Doctor)
+            .join(User, Doctor.user_id == User.id)
+            .filter(User.email == "approve-custom-schedule@test.com")
+            .one()
+        )
+
+        approve = await client.post(
+            f"/api/v1/admin/doctors/{doctor.id}/approve",
+            json={},
+            headers=admin_headers,
+        )
+
+        assert approve.status_code == 200
+        schedules = db.query(DoctorSchedule).filter(
+            DoctorSchedule.doctor_id == doctor.id
+        ).all()
+        assert len(schedules) == 1
+        assert schedules[0].day_of_week.value == "tuesday"
+        assert schedules[0].slot_duration_minutes == 20
+
     async def test_approve_manual_hospital_doctor_creates_hospital(
         self, client, db, admin_headers
     ):
