@@ -5,8 +5,9 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.models.appointment import Appointment
 from app.models.doctor import Doctor, DoctorLeave, DoctorSchedule, DoctorSlotBlock
-from app.models.enums import DayOfWeek
+from app.models.enums import AppointmentStatus, DayOfWeek, UserRole
 from app.models.user import User
 from app.repositories.appointment_repo import AppointmentRepository
 from app.repositories.doctor_repo import DoctorRepository
@@ -22,6 +23,8 @@ from app.schemas.doctor import (
     SlotResponse,
 )
 from app.schemas.pagination import PaginatedResponse, PaginationParams
+from app.services.audit_log_service import AuditLogService
+from app.services.notification_service import notification_service
 
 
 class DoctorService:
@@ -199,6 +202,15 @@ class DoctorService:
             raise ValueError("Cannot mark leave for a past date")
         if self.doctor_repo.get_leave_for_date(doctor_id, payload.leave_date):
             raise ValueError(f"Leave already marked for {payload.leave_date}")
+        affected_appointments = self._get_leave_affected_appointments(
+            doctor.id, payload.leave_date
+        )
+        if affected_appointments and not payload.cancel_existing_appointments:
+            raise ValueError(
+                f"{len(affected_appointments)} scheduled appointment"
+                f"{'' if len(affected_appointments) == 1 else 's'} exist on this date. "
+                "Confirm cancellation to mark this date closed."
+            )
 
         leave = DoctorLeave(
             doctor_id=doctor.id,
@@ -206,8 +218,58 @@ class DoctorService:
             reason=payload.reason,
         )
         self.db.add(leave)
+        cancelled_ids: list[UUID] = []
+        if affected_appointments:
+            reason = payload.cancellation_reason or payload.reason or "Doctor unavailable"
+            for appointment in affected_appointments:
+                appointment.status = AppointmentStatus.CANCELLED
+                appointment.cancellation_reason = reason
+                cancelled_ids.append(appointment.id)
+                AuditLogService(self.db).record(
+                    actor_user_id=actor_user_id,
+                    actor_role=(
+                        UserRole.WEBSITE_ADMIN.value
+                        if is_website_admin
+                        else UserRole.DOCTOR.value
+                    ),
+                    action="appointment.cancelled",
+                    target_type="appointment",
+                    target_id=appointment.id,
+                    summary=(
+                        "Cancelled appointment because doctor closed "
+                        f"{payload.leave_date.isoformat()}"
+                    ),
+                    details={
+                        "reason": reason,
+                        "doctor_id": str(doctor.id),
+                        "patient_id": str(appointment.patient_id),
+                        "slot_time": appointment.slot_time.isoformat(),
+                        "leave_date": payload.leave_date.isoformat(),
+                    },
+                )
+            AuditLogService(self.db).record(
+                actor_user_id=actor_user_id,
+                actor_role=(
+                    UserRole.WEBSITE_ADMIN.value
+                    if is_website_admin
+                    else UserRole.DOCTOR.value
+                ),
+                action="doctor.leave.created",
+                target_type="doctor",
+                target_id=doctor.id,
+                summary=f"Closed doctor availability for {payload.leave_date.isoformat()}",
+                details={
+                    "leave_date": payload.leave_date.isoformat(),
+                    "reason": payload.reason,
+                    "cancelled_appointment_ids": [str(item) for item in cancelled_ids],
+                },
+            )
         self.db.commit()
         self.db.refresh(leave)
+        for appointment_id in cancelled_ids:
+            appointment = self.appointment_repo.get_by_id_with_relations(appointment_id)
+            if appointment:
+                notification_service.notify_appointment_cancelled(appointment, self.db)
         return LeaveResponse.model_validate(leave)
 
     def list_leaves(
@@ -355,6 +417,18 @@ class DoctorService:
             slot_time = appointment.slot_time.replace(tzinfo=None).time()
             if payload.start_time <= slot_time < payload.end_time:
                 raise ValueError("Cannot block a time that already has an appointment")
+
+    def _get_leave_affected_appointments(
+        self, doctor_id: UUID, leave_date: date
+    ) -> list[Appointment]:
+        return [
+            appointment
+            for appointment in self.appointment_repo.get_doctor_appointments_for_date(
+                doctor_id, leave_date
+            )
+            if appointment.status
+            in (AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED)
+        ]
 
     @staticmethod
     def _block_for_slot(current: datetime, blocks: list[DoctorSlotBlock]) -> DoctorSlotBlock | None:

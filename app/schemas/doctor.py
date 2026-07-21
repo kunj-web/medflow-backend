@@ -7,6 +7,7 @@ from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 from app.models.enums import DayOfWeek, Gender, WorkType
 from app.schemas.validators.common import (
+    validate_cancellation_reason,
     validate_non_empty_string,
     validate_positive_amount,
 )
@@ -56,6 +57,8 @@ class ScheduleResponse(BaseModel):
 class LeaveCreate(BaseModel):
     leave_date: date
     reason: str | None = None
+    cancel_existing_appointments: bool = False
+    cancellation_reason: str | None = None
 
     @field_validator("reason", mode="before")
     @classmethod
@@ -63,6 +66,21 @@ class LeaveCreate(BaseModel):
         if v is not None:
             return validate_non_empty_string(v)
         return v
+
+    @field_validator("cancellation_reason", mode="before")
+    @classmethod
+    def clean_cancellation_reason(cls, v: str | None) -> str | None:
+        if v is not None:
+            return validate_cancellation_reason(v)
+        return v
+
+    @model_validator(mode="after")
+    def cancellation_reason_required(self) -> LeaveCreate:
+        if self.cancel_existing_appointments and not self.cancellation_reason:
+            raise ValueError(
+                "cancellation_reason is required when cancelling existing appointments"
+            )
+        return self
 
 
 class LeaveResponse(BaseModel):
