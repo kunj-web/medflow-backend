@@ -123,18 +123,18 @@ class AdminReviewService:
         return hospital
 
     def _ensure_default_schedules(self, doctor: Doctor) -> None:
-        existing_days = {
-            day
-            for (day,) in self.db.query(DoctorSchedule.day_of_week)
+        existing_count = (
+            self.db.query(DoctorSchedule.id)
             .filter(
                 DoctorSchedule.doctor_id == doctor.id,
                 DoctorSchedule.deleted_at.is_(None),
             )
-            .all()
-        }
+            .count()
+        )
+        if existing_count > 0:
+            return
+
         for day in DayOfWeek:
-            if day in existing_days:
-                continue
             self.db.add(
                 DoctorSchedule(
                     doctor_id=doctor.id,
