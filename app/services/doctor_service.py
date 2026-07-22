@@ -269,7 +269,11 @@ class DoctorService:
         for appointment_id in cancelled_ids:
             appointment = self.appointment_repo.get_by_id_with_relations(appointment_id)
             if appointment:
-                notification_service.notify_appointment_cancelled(appointment, self.db)
+                notification_service.notify_appointment_cancelled(
+                    appointment,
+                    self.db,
+                    cancellation_source="doctor_date_closure",
+                )
         return LeaveResponse.model_validate(leave)
 
     def list_leaves(
