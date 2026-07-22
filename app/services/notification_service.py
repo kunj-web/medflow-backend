@@ -256,7 +256,12 @@ class NotificationService:
         )
         db.commit()
 
-    def notify_appointment_cancelled(self, appointment: Appointment, db: Session) -> None:
+    def notify_appointment_cancelled(
+        self,
+        appointment: Appointment,
+        db: Session,
+        cancellation_source: str | None = None,
+    ) -> None:
         """
         Notify patient and doctor when an appointment is cancelled.
         Called from AppointmentService.cancel() after commit.
@@ -264,15 +269,40 @@ class NotificationService:
         patient = appointment.patient
         doctor = appointment.doctor
         slot = _fmt_slot(appointment.slot_time)
+        is_doctor_closure = cancellation_source == "doctor_date_closure"
+
+        patient_title = (
+            "Doctor closed availability for this date"
+            if is_doctor_closure
+            else "Appointment Cancelled"
+        )
+        patient_body = (
+            f"Dr. {doctor.last_name} closed availability for {slot}. "
+            "Your appointment has been cancelled."
+            if is_doctor_closure
+            else f"Your appointment with Dr. {doctor.last_name} on {slot} has been cancelled."
+        )
+        doctor_title = (
+            "Date availability closed"
+            if is_doctor_closure
+            else "Appointment Cancelled"
+        )
+        doctor_body = (
+            f"You closed availability for {slot}. Appointment with "
+            f"{patient.first_name} {patient.last_name} was cancelled."
+            if is_doctor_closure
+            else f"Appointment with {patient.first_name} {patient.last_name} at {slot} was cancelled."
+        )
 
         # --- Patient push ---
         self.send_push(
             user_id=str(patient.user_id),
-            title="Appointment Cancelled",
-            body=f"Your appointment with Dr. {doctor.last_name} on {slot} has been cancelled.",
+            title=patient_title,
+            body=patient_body,
             data={
                 "type": "appointment_cancelled",
                 "category": "appointments",
+                "event": cancellation_source or "appointment_cancelled",
                 "appointment_id": str(appointment.id),
                 "doctor_name": f"Dr. {doctor.first_name} {doctor.last_name}",
                 "slot_time": appointment.slot_time.isoformat(),
@@ -300,11 +330,12 @@ class NotificationService:
         # --- Doctor push ---
         self.send_push(
             user_id=str(doctor.user_id),
-            title="Appointment Cancelled",
-            body=f"Appointment with {patient.first_name} {patient.last_name} at {slot} was cancelled.",
+            title=doctor_title,
+            body=doctor_body,
             data={
                 "type": "appointment_cancelled",
                 "category": "appointments",
+                "event": cancellation_source or "appointment_cancelled",
                 "appointment_id": str(appointment.id),
                 "patient_name": f"{patient.first_name} {patient.last_name}",
                 "slot_time": appointment.slot_time.isoformat(),

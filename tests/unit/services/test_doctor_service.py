@@ -5,6 +5,7 @@ import pytest
 
 from app.models.doctor import DoctorLeave
 from app.models.enums import AccountStatus, AppointmentStatus, DayOfWeek, UserRole
+from app.models.notification import Notification
 from app.repositories.doctor_repo import DoctorRepository
 from app.schemas.doctor import LeaveCreate, ScheduleCreate, SlotBlockCreate
 from app.schemas.pagination import PaginationParams
@@ -215,6 +216,16 @@ class TestDoctorLeaveAndSlots:
             appointment.cancellation_reason
             == "Doctor unavailable due to clinic closure"
         )
+        notification = (
+            db.query(Notification)
+            .filter(
+                Notification.user_id == patient.user_id,
+                Notification.title == "Doctor closed availability for this date",
+            )
+            .one()
+        )
+        assert "closed availability" in notification.message
+        assert notification.data["event"] == "doctor_date_closure"
 
     def test_get_slots_uses_schedule_duration(self, db, hospital):
         doctor = DoctorFactory.create(db, hospital.id)
