@@ -1,9 +1,10 @@
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from uuid import uuid4
 
 from app.core.security import create_token_pair
 from app.models.enums import AccountStatus, DayOfWeek, UserRole
 from tests.factories.doctor_factory import DoctorFactory
+from tests.factories.patient_factory import PatientFactory
 from tests.factories.user_factory import UserFactory
 
 
@@ -24,6 +25,17 @@ def headers_for(user_id, role=UserRole.DOCTOR):
         role == UserRole.WEBSITE_ADMIN,
     )
     return {"Authorization": f"Bearer {tokens['access_token']}"}
+
+
+async def book_appointment(client, doctor, patient, target: date, value: time):
+    return await client.post(
+        "/api/v1/appointments/",
+        json={
+            "doctor_id": str(doctor.id),
+            "slot_time": datetime.combine(target, value).isoformat(),
+        },
+        headers=headers_for(patient.user_id, UserRole.PATIENT),
+    )
 
 
 class TestDoctorListing:
@@ -228,6 +240,63 @@ class TestDoctorSchedule:
         )
 
         assert response.status_code == 201
+        slots = await client.get(
+            f"/api/v1/doctors/{doctor.id}/slots?date={target.isoformat()}"
+        )
+        assert slots.status_code == 200
+        assert slots.json() == []
+
+    async def test_leave_with_booked_appointments_requires_confirmation(
+        self, client, db, hospital
+    ):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+        booked = await book_appointment(client, doctor, patient, target, time(10, 0))
+        assert booked.status_code == 201
+
+        response = await client.post(
+            f"/api/v1/doctors/{doctor.id}/leave",
+            json={"leave_date": target.isoformat(), "reason": "Clinic closed"},
+            headers=headers_for(doctor.user_id),
+        )
+
+        assert response.status_code == 409
+        assert "Confirm cancellation" in response.json()["detail"]
+
+    async def test_leave_can_cancel_booked_appointments_with_reason(
+        self, client, db, hospital
+    ):
+        doctor = DoctorFactory.create(db, hospital.id)
+        patient = PatientFactory.create(db, hospital.id)
+        target = next_weekday(DayOfWeek.MONDAY)
+        booked = await book_appointment(client, doctor, patient, target, time(10, 0))
+        assert booked.status_code == 201
+        appointment_id = booked.json()["id"]
+
+        response = await client.post(
+            f"/api/v1/doctors/{doctor.id}/leave",
+            json={
+                "leave_date": target.isoformat(),
+                "reason": "Clinic closed",
+                "cancel_existing_appointments": True,
+                "cancellation_reason": "Doctor unavailable due to clinic closure",
+            },
+            headers=headers_for(doctor.user_id),
+        )
+
+        assert response.status_code == 201
+        appointment = await client.get(
+            f"/api/v1/appointments/{appointment_id}",
+            headers=headers_for(patient.user_id, UserRole.PATIENT),
+        )
+        assert appointment.status_code == 200
+        assert appointment.json()["status"] == "cancelled"
+        assert (
+            appointment.json()["cancellation_reason"]
+            == "Doctor unavailable due to clinic closure"
+        )
+
         slots = await client.get(
             f"/api/v1/doctors/{doctor.id}/slots?date={target.isoformat()}"
         )
